@@ -105,6 +105,52 @@ program
     await startCommand(ticketId);
   });
 
+// ── profile ───────────────────────────────────────────────────────────────────
+
+const profileCmd = program
+  .command('profile')
+  .description('Manage named profiles (credentials + project settings)');
+
+profileCmd
+  .command('list')
+  .description('List all profiles')
+  .action(() => {
+    const { profileListCommand } = require('./commands/profile') as typeof import('./commands/profile');
+    profileListCommand();
+  });
+
+profileCmd
+  .command('use <name>')
+  .description('Set the globally active profile')
+  .action((name: string) => {
+    const { profileUseCommand } = require('./commands/profile') as typeof import('./commands/profile');
+    profileUseCommand(name);
+  });
+
+profileCmd
+  .command('add [name]')
+  .description('Add a new profile (interactive wizard)')
+  .action(async (name?: string) => {
+    const { profileAddCommand } = await import('./commands/profile');
+    await profileAddCommand(name);
+  });
+
+profileCmd
+  .command('remove <name>')
+  .description('Delete a profile')
+  .action((name: string) => {
+    const { profileRemoveCommand } = require('./commands/profile') as typeof import('./commands/profile');
+    profileRemoveCommand(name);
+  });
+
+profileCmd
+  .command('local')
+  .description('Create / update a .flowlane file in the current repo')
+  .action(async () => {
+    const { profileInitLocalCommand } = await import('./commands/profile');
+    await profileInitLocalCommand();
+  });
+
 // ── config ────────────────────────────────────────────────────────────────────
 
 const configCmd = program

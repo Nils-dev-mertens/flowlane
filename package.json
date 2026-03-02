@@ -14,7 +14,14 @@
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run build"
   },
-  "keywords": ["cli", "agile", "devops", "kanban", "workflow", "developer-tools"],
+  "keywords": [
+    "cli",
+    "agile",
+    "devops",
+    "kanban",
+    "workflow",
+    "developer-tools"
+  ],
   "license": "MIT",
   "dependencies": {
     "@clack/prompts": "^0.7.0",

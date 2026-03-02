@@ -3,6 +3,7 @@ import { container } from '../container';
 import { TOKENS } from '../tokens';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { FlowlaneConfig } from '../types';
+import { ConfigService } from '../config/ConfigService';
 
 export function configSetCommand(key: string, value: string): void {
   const cfg = container.resolve<IConfigService>(TOKENS.ConfigService);
@@ -30,16 +31,23 @@ export function configGetCommand(key: string): void {
 }
 
 export function configListCommand(): void {
-  const cfg = container.resolve<IConfigService>(TOKENS.ConfigService);
+  const cfg = container.resolve<ConfigService>(TOKENS.ConfigService);
 
   if (!cfg.exists()) {
     console.log(chalk.yellow('No config found. Run: flowlane init'));
     return;
   }
 
-  const config = cfg.getAll();
+  const profileName = cfg.getActiveProfileName();
+  const localPath   = cfg.localConfigPath;
 
-  console.log(chalk.bold('Current configuration:'));
+  console.log(
+    chalk.bold('Active config') +
+    (profileName ? chalk.dim(` — profile: ${chalk.cyan(profileName)}`) : '') +
+    (localPath   ? chalk.dim(` — local: ${localPath}`) : ''),
+  );
+
+  const config = cfg.getAll();
   for (const [key, value] of Object.entries(config)) {
     const display = key === 'token' ? chalk.dim('***') : String(value);
     console.log(`  ${chalk.cyan(key.padEnd(14))} ${display}`);

@@ -2,60 +2,27 @@
 
 > **Ticket → Branch → PR** — Agile board workflow automation for the command line.
 
-`flowlane` automates the daily developer loop: browse your board, create a
-well-named branch, push it, open a pull request, link the work item, and
-transition the ticket to *In Review* — all without leaving the terminal.
+Build a TypeScript CLI tool that automates the daily developer workflow from agile board item to pull request. Platform-agnostic, designed to support Azure DevOps Boards and Jira.
 
 ---
 
-## Name candidates
+## Name
 
-| Name | Rationale |
-|------|-----------|
+| Candidate | Rationale |
+|-----------|-----------|
 | **flowlane** ✓ | Kanban *lanes* + forward *flow*; short, vendor-agnostic |
-| `tickflow` | Ticket pipeline, very direct |
+| `tickflow` | Ticket pipeline |
 | `kanrun` | Kanban + run/execute |
 | `swimlane` | Classic kanban term |
 | `boardctl` | Board control, kubectl-style |
 
-`flowlane` was chosen as the strongest: it captures the lane-progression
-metaphor without referencing any vendor.
+`flowlane` chosen: lane-progression metaphor, no vendor reference, works as a CLI command.
 
 ---
 
-## Features
+## Core workflow
 
-- **Interactive TUI** — searchable ticket picker with action menu (`@clack/prompts`)
-- **Auto branch naming** — `feature/<id>-<slugified-title>` from ticket metadata
-- **Full workflow** — one command to branch + push + PR + set to review
-- **Provider-agnostic** — Azure DevOps fully implemented; Jira stub ready to extend
-- **Dependency injection** — `tsyringe` + interfaces; swap providers without touching commands
-- **Auto-init** — first run launches the setup wizard automatically
-
----
-
-## Installation
-
-```bash
-# From source
-git clone <repo>
-cd flowlane
-npm install
-npm run build
-npm link          # makes `flowlane` available globally
-```
-
----
-
-## Quick start
-
-```bash
-# First run — launches the setup wizard automatically
-flowlane tickets
-
-# Or run the wizard explicitly
-flowlane init
-```
+`view ticket → create branch → push → open PR → link work item → set ticket to "In Review"`
 
 ---
 
@@ -63,46 +30,131 @@ flowlane init
 
 | Command | Description |
 |---------|-------------|
-| `flowlane` | Alias for `flowlane tickets` (interactive TUI) |
-| `flowlane tickets [--user <u>]` | Browse & act on assigned tickets |
-| `flowlane branch <ticketId>` | Fetch ticket, create branch, push to origin |
+| `flowlane` | Alias for `flowlane tickets` |
+| `flowlane tickets [--user <u>]` | Interactive TUI ticket picker |
+| `flowlane branch <ticketId>` | Fetch ticket, generate branch name, create & push |
 | `flowlane pr <ticketId>` | Create PR and link work item |
 | `flowlane review <ticketId> [--status <s>]` | Set ticket status (default: *In Review*) |
 | `flowlane start <ticketId>` | Full workflow: branch → PR → review |
 | `flowlane init` | Interactive setup wizard |
-| `flowlane config list` | Print all config values |
 | `flowlane config get <key>` | Print one config value |
 | `flowlane config set <key> <value>` | Update a config value |
+| `flowlane config list` | Print all config values |
+
+---
+
+## Interactive TUI (`@clack/prompts`)
+
+Triggered by `flowlane tickets` or any command run without arguments:
+
+- Styled header showing configured project and current user
+- Searchable/filterable list of open tickets assigned to the user (id, title, status)
+- After selecting a ticket, action menu: create branch · create PR · set to review · view details · full start flow
+- Spinners during API calls
+- Clear success/error feedback with details (branch name, PR URL)
+- Keyboard navigation and ESC cancellation
 
 ---
 
 ## Configuration
 
-Config is stored at `~/.config/flowlane/config.json`.
-
-Run `flowlane init` to create it interactively, or copy
-`example.config.json` and edit manually.
-
-### Fields
+Stored at `~/.config/flowlane/config.json`. Auto-created on first run via `init` wizard.
 
 | Key | Required | Description |
 |-----|----------|-------------|
-| `platform` | ✓ | Provider: `azuredevops` or `jira` |
-| `org` | ✓ | Azure DevOps org name (or Jira subdomain) |
+| `platform` | ✓ | `azuredevops` or `jira` |
+| `org` | ✓ | ADO org name or Jira subdomain |
 | `project` | ✓ | Project / board name |
-| `repo` | — | Git repository name (defaults to `project`) |
-| `token` | ✓ | Personal Access Token / API token |
-| `user` | ✓ | Your identity string (email or display name) |
-| `baseBranch` | — | PR target branch (default: `main`) |
+| `repo` | — | Git repo name (defaults to `project`) |
+| `token` | ✓ | PAT / API token |
+| `user` | ✓ | Email or display name |
+| `baseBranch` | — | PR target (default: `main`) |
 | `baseUrl` | — | Self-hosted ADO / Jira URL |
 
-### Azure DevOps PAT scopes required
+If config is missing, auto-run `init`. Validate required fields before API calls; provide actionable errors.
 
-- **Work Items** — Read & Write
-- **Code** — Read & Write
-- **Pull Request Threads** — Read & Write
+Azure DevOps PAT scopes: **Work Items** Read+Write · **Code** Read+Write · **Pull Request Threads** Read+Write
 
-### Example config
+---
+
+## Architecture
+
+```
+src/
+├── index.ts              Entry point & Commander setup
+├── container.ts          tsyringe DI — lazy platform factories
+├── tokens.ts             DI injection tokens
+├── types/index.ts        Shared domain types (Ticket, PR, …)
+├── config/
+│   └── ConfigService.ts  IConfigService — reads/writes config.json
+├── services/
+│   ├── interfaces/
+│   │   ├── IConfigService.ts   get<T>, set, exists, validate
+│   │   ├── ITicketService.ts   getTicket, getTicketsForUser, updateStatus
+│   │   ├── IGitService.ts      createBranch, publishBranch, getCurrentBranch
+│   │   └── IPRService.ts       createPR, linkWorkItem
+│   ├── azuredevops/
+│   │   ├── AzureDevOpsTicketService.ts   WIQL + work item updates
+│   │   └── AzureDevOpsPRService.ts       Git PR API + work item refs
+│   ├── jira/
+│   │   ├── JiraTicketService.ts   Stub
+│   │   └── JiraPRService.ts       Stub
+│   └── git/
+│       └── GitService.ts    Wraps `git` CLI via child_process
+├── commands/
+│   ├── init.ts       Setup wizard
+│   ├── tickets.ts    Interactive TUI picker
+│   ├── branch.ts     Branch creation flow
+│   ├── pr.ts         PR creation flow
+│   ├── review.ts     Status transition
+│   ├── start.ts      Orchestrates branch + pr + review
+│   └── config.ts     Config get/set/list
+└── utils/
+    ├── branch.ts     generateBranchName() → feature/<id>-<slug>
+    └── display.ts    Chalk formatting helpers
+```
+
+### Dependency injection
+
+Use `tsyringe` with `instanceCachingFactory` (lazy singletons). Register services in `src/container.ts` based on `platform` from config. Container is valid before `init` runs — factories read platform at resolution time, not registration time.
+
+To add a provider: implement the interfaces under `src/services/<provider>/`, add a `case` in the two factories in `container.ts`. No command changes needed.
+
+---
+
+## Tech stack
+
+`typescript` · `commander` · `@clack/prompts` · `tsyringe` · `reflect-metadata` · `chalk` · `azure-devops-node-api`
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020", "module": "CommonJS",
+    "experimentalDecorators": true, "emitDecoratorMetadata": true,
+    "strict": true, "esModuleInterop": true
+  }
+}
+```
+
+---
+
+## Installation
+
+```bash
+git clone <repo> && cd flowlane
+bun install        # or npm install
+bun run build      # or npm run build
+npm link           # makes `flowlane` available globally
+```
+
+## Development
+
+```bash
+bun run dev -- tickets     # run via ts-node
+bun run build              # compile to dist/
+```
+
+## Example config
 
 ```json
 {
@@ -114,90 +166,4 @@ Run `flowlane init` to create it interactively, or copy
   "user": "jane.doe@my-company.com",
   "baseBranch": "main"
 }
-```
-
----
-
-## Architecture
-
-```
-src/
-├── index.ts                        Entry point & Commander setup
-├── container.ts                    tsyringe DI container (lazy factories)
-├── tokens.ts                       DI injection tokens
-├── types/
-│   └── index.ts                    Shared domain types
-├── config/
-│   └── ConfigService.ts            IConfigService — reads/writes ~/.config/flowlane/config.json
-├── services/
-│   ├── interfaces/
-│   │   ├── IConfigService.ts
-│   │   ├── ITicketService.ts       get/list/updateStatus
-│   │   ├── IGitService.ts          createBranch/publishBranch/getCurrentBranch
-│   │   └── IPRService.ts           createPR/linkWorkItem
-│   ├── azuredevops/
-│   │   ├── AzureDevOpsTicketService.ts   WIQL queries + work item updates
-│   │   └── AzureDevOpsPRService.ts       Git PR API + work item refs
-│   ├── jira/
-│   │   ├── JiraTicketService.ts    Stub — contribute to activate
-│   │   └── JiraPRService.ts        Stub
-│   └── git/
-│       └── GitService.ts           Wraps `git` CLI via child_process
-├── commands/
-│   ├── init.ts                     Setup wizard
-│   ├── tickets.ts                  Interactive TUI picker
-│   ├── branch.ts                   Branch creation flow
-│   ├── pr.ts                       PR creation flow
-│   ├── review.ts                   Status transition flow
-│   ├── start.ts                    Orchestrates branch + pr + review
-│   └── config.ts                   Config get/set/list
-└── utils/
-    ├── branch.ts                   generateBranchName()
-    └── display.ts                  Chalk formatting helpers
-```
-
-### Dependency injection
-
-Services are registered in `src/container.ts` using `instanceCachingFactory`
-(lazy singletons).  The factory reads `platform` from `ConfigService` at first
-resolution, so the container is always valid — even before `flowlane init` has
-run.
-
-To add a new provider:
-
-1. Create `src/services/<provider>/MyTicketService.ts` implementing `ITicketService`
-2. Add a `case '<provider>':` branch in the two factories in `container.ts`
-3. Done — no command code changes needed.
-
----
-
-## Adding Jira support
-
-The stubs in `src/services/jira/` implement the correct interfaces.  Replace
-the method bodies with calls to the [Jira REST API v3](https://developer.atlassian.com/cloud/jira/platform/rest/v3/):
-
-```ts
-// Example: getTicket
-async getTicket(id: string): Promise<Ticket> {
-  const baseUrl = this.config.get<string>('baseUrl')
-    ?? `https://${this.config.get('org')}.atlassian.net`;
-  const resp = await fetch(`${baseUrl}/rest/api/3/issue/${id}`, {
-    headers: { Authorization: `Basic ${btoa(`${user}:${token}`)}` },
-  });
-  const json = await resp.json();
-  return { id: json.key, title: json.fields.summary, status: json.fields.status.name };
-}
-```
-
-Because `JiraTicketService` already implements `ITicketService`, the rest of
-the codebase requires zero changes.
-
----
-
-## Development
-
-```bash
-npm run dev -- tickets          # run via ts-node
-npm run build                   # compile to dist/
-npm run build:watch             # watch mode
 ```

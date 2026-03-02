@@ -38,3 +38,20 @@ export interface CreatePRParams {
   sourceBranch: string;
   targetBranch: string;
 }
+
+// ── Multi-profile config file format ─────────────────────────────────────────
+
+/** Shape of ~/.config/flowlane/config.json */
+export interface ProfilesFile {
+  activeProfile: string;
+  profiles: Record<string, Partial<FlowlaneConfig>>;
+}
+
+/**
+ * Shape of .flowlane in a git repo root.
+ * `profile` selects which global profile to use.
+ * All other keys override that profile's values for this repo.
+ */
+export interface LocalRepoConfig extends Partial<FlowlaneConfig> {
+  profile?: string;
+}

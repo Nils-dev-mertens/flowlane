@@ -3,158 +3,65 @@ import chalk from 'chalk';
 import { container } from '../container';
 import { TOKENS } from '../tokens';
 import { ConfigService } from '../config/ConfigService';
-import type { FlowlaneConfig } from '../types';
+import { profileAddCommand, profileInitLocalCommand } from './profile';
 
 export async function initCommand(): Promise<void> {
   p.intro(chalk.bgCyan.black('  flowlane init  ') + chalk.dim('  Setup wizard'));
 
-  const configService = container.resolve<ConfigService>(TOKENS.ConfigService);
-  const configPath    = configService.configFilePath;
+  const cfg = container.resolve<ConfigService>(TOKENS.ConfigService);
 
-  if (configService.exists()) {
-    const overwrite = await p.confirm({
-      message: `Config already exists at ${chalk.yellow(configPath)}. Overwrite it?`,
-      initialValue: false,
-    });
-    if (p.isCancel(overwrite) || !overwrite) {
-      p.outro('Setup cancelled. Existing config preserved.');
+  // ── If profiles already exist, offer a choice ─────────────────────────────
+
+  if (cfg.exists()) {
+    const action = await p.select({
+      message: 'What would you like to do?',
+      options: [
+        { value: 'add',   label: 'Add a new profile',                hint: 'new org / platform / token' },
+        { value: 'local', label: 'Set up this repo (.flowlane)',      hint: 'pick a profile + per-repo overrides' },
+        { value: 'list',  label: 'List existing profiles',            hint: '' },
+      ],
+    }) as string;
+
+    if (p.isCancel(action)) { p.cancel('Cancelled.'); return; }
+
+    if (action === 'add')   { await profileAddCommand();        return; }
+    if (action === 'local') { await profileInitLocalCommand();  return; }
+
+    if (action === 'list') {
+      const names  = cfg.listProfiles();
+      const active = cfg.getActiveProfileName();
+      p.note(
+        names.map((n) => {
+          const pr  = cfg.getProfile(n)!;
+          const dot = n === active ? chalk.green('●') : chalk.dim('○');
+          return `${dot} ${n === active ? chalk.green.bold(n) : n}  ${chalk.dim(`${pr.platform} · ${pr.org} · ${pr.project}`)}`;
+        }).join('\n'),
+        'Profiles',
+      );
+      p.outro(`Run ${chalk.cyan('flowlane init')} again to add or configure.`);
       return;
     }
   }
 
+  // ── First-run: create the first profile ───────────────────────────────────
+
   p.note(
-    `This wizard creates your flowlane config file.\nPath: ${chalk.yellow(configPath)}`,
+    `No config found. Let's create your first profile.\nGlobal config: ${chalk.yellow(cfg.configFilePath)}`,
     'Welcome',
   );
 
-  // ── Platform ──────────────────────────────────────────────────────────────
+  await profileAddCommand('default');
 
-  const platform = await p.select({
-    message: 'Select your agile platform:',
-    options: [
-      {
-        value: 'azuredevops',
-        label: 'Azure DevOps',
-        hint: 'dev.azure.com — fully implemented',
-      },
-      {
-        value: 'jira',
-        label: 'Jira (stub)',
-        hint: 'atlassian.net — contributions welcome',
-      },
-    ],
-  }) as string;
-
-  if (p.isCancel(platform)) { p.cancel('Setup cancelled.'); return; }
-
-  // ── Org / subdomain ───────────────────────────────────────────────────────
-
-  const orgLabel = platform === 'azuredevops'
-    ? 'Azure DevOps organization name:'
-    : 'Jira subdomain (e.g. mycompany):';
-
-  const org = await p.text({
-    message: orgLabel,
-    placeholder: platform === 'azuredevops' ? 'my-company' : 'my-company',
-    validate: (v) => v.trim() ? undefined : 'Required',
-  }) as string;
-
-  if (p.isCancel(org)) { p.cancel('Setup cancelled.'); return; }
-
-  // ── Project ───────────────────────────────────────────────────────────────
-
-  const project = await p.text({
-    message: 'Project name:',
-    placeholder: 'MyProject',
-    validate: (v) => v.trim() ? undefined : 'Required',
-  }) as string;
-
-  if (p.isCancel(project)) { p.cancel('Setup cancelled.'); return; }
-
-  // ── Repository (Azure DevOps only) ────────────────────────────────────────
-
-  let repo: string | undefined;
-  if (platform === 'azuredevops') {
-    const repoInput = await p.text({
-      message: 'Git repository name (leave blank to use project name):',
-      placeholder: project,
-    }) as string;
-    if (p.isCancel(repoInput)) { p.cancel('Setup cancelled.'); return; }
-    if(repoInput == undefined){
-      repo == project;
+  // After creating the first profile, offer to set up repo-local config
+  if (cfg.exists()) {
+    const setupLocal = await p.confirm({
+      message: 'Set up a .flowlane file for the current repo as well?',
+      initialValue: false,
+    });
+    if (!p.isCancel(setupLocal) && setupLocal) {
+      await profileInitLocalCommand();
     }
-    else {repo = repoInput.trim() || project;}
   }
 
-  // ── Token ─────────────────────────────────────────────────────────────────
-
-  const tokenHint = platform === 'azuredevops'
-    ? 'dev.azure.com → User Settings → Personal Access Tokens\nScopes needed: Work Items (Read & Write), Code (Read & Write), Pull Requests (Read & Write)'
-    : 'id.atlassian.com → Manage profile → Security → API tokens';
-
-  p.note(tokenHint, 'How to get a token');
-
-  const token = await p.password({
-    message: 'API token / Personal Access Token:',
-    validate: (v) => v.trim() ? undefined : 'Required',
-  }) as string;
-
-  if (p.isCancel(token)) { p.cancel('Setup cancelled.'); return; }
-
-  // ── User identity ─────────────────────────────────────────────────────────
-
-  const userHint = platform === 'azuredevops'
-    ? 'Your email or display name exactly as shown in Azure DevOps'
-    : 'Your Jira account email address';
-
-  const user = await p.text({
-    message: 'Your username (used to fetch assigned tickets):',
-    placeholder: userHint,
-    validate: (v) => v.trim() ? undefined : 'Required',
-  }) as string;
-
-  if (p.isCancel(user)) { p.cancel('Setup cancelled.'); return; }
-
-  // ── Base branch ───────────────────────────────────────────────────────────
-
-  const baseBranch = await p.text({
-    message: 'Base / target branch for pull requests:',
-    placeholder: 'main',
-    defaultValue: 'main',
-  }) as string;
-
-  if (p.isCancel(baseBranch)) { p.cancel('Setup cancelled.'); return; }
-
-  // ── Persist ───────────────────────────────────────────────────────────────
-
-  const spinner = p.spinner();
-  spinner.start('Saving configuration…');
-
-  const config: Partial<FlowlaneConfig> = {
-    platform:   platform as FlowlaneConfig['platform'],
-    org:        org.trim(),
-    project:    project.trim(),
-    token:      token.trim(),
-    user:       user.trim(),
-    baseBranch: (baseBranch || 'main').trim(),
-  };
-  if (repo) config.repo = repo.trim();
-
-  for (const [key, value] of Object.entries(config)) {
-    await configService.set(key as keyof FlowlaneConfig, String(value));
-  }
-
-  spinner.stop('Configuration saved.');
-
-  p.note(
-    Object.entries(config)
-      .map(([k, v]) => `${chalk.dim(k.padEnd(12))} ${k === 'token' ? chalk.dim('***') : v}`)
-      .join('\n'),
-    'Saved',
-  );
-
-  p.outro(
-    `${chalk.green('✓')} Setup complete! ` +
-    `Run ${chalk.cyan('flowlane tickets')} to browse your board.`,
-  );
+  p.outro(`${chalk.green('✓')} Ready! Run ${chalk.cyan('flowlane tickets')} to browse your board.`);
 }
