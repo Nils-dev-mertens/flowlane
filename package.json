@@ -1,0 +1,32 @@
+{
+  "name": "flowlane",
+  "version": "0.1.0",
+  "description": "Agile board to pull request workflow automation — Ticket → Branch → PR",
+  "main": "dist/index.js",
+  "bin": {
+    "flowlane": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "dev": "ts-node src/index.ts",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["cli", "agile", "devops", "kanban", "workflow", "developer-tools"],
+  "license": "MIT",
+  "dependencies": {
+    "@clack/prompts": "^0.7.0",
+    "azure-devops-node-api": "^12.5.0",
+    "chalk": "^4.1.2",
+    "commander": "^12.0.0",
+    "reflect-metadata": "^0.2.2",
+    "tsyringe": "^4.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
