@@ -22,7 +22,7 @@ Build a TypeScript CLI tool that automates the daily developer workflow from agi
 
 ## Core workflow
 
-`view ticket → create branch → push → open PR → link work item → set ticket to "In Review"`
+`view ticket → create branch → push → open PR → link work item → set ticket to "Ready for Review"`
 
 ---
 
@@ -34,7 +34,7 @@ Build a TypeScript CLI tool that automates the daily developer workflow from agi
 | `flowlane tickets [--user <u>]` | Interactive TUI ticket picker |
 | `flowlane branch <ticketId>` | Fetch ticket, generate branch name, create & push |
 | `flowlane pr <ticketId>` | Create PR and link work item |
-| `flowlane review <ticketId> [--status <s>]` | Set ticket status (default: *In Review*) |
+| `flowlane review <ticketId> [--status <s>]` | Set ticket status (default: *Ready for Review*) |
 | `flowlane start <ticketId>` | Full workflow: branch → PR → review |
 | `flowlane init` | Interactive setup wizard |
 | `flowlane config get <key>` | Print one config value |

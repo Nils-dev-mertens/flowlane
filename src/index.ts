@@ -81,8 +81,8 @@ program
 
 program
   .command('review <ticketId>')
-  .description('Set a ticket status to "In Review"')
-  .option('--status <status>', 'Custom status string to set', 'In Review')
+  .description('Set a ticket status to "Ready for Review"')
+  .option('--status <status>', 'Custom status string to set', 'Ready for Review')
   .action(async (ticketId: string, opts: { status: string }) => {
     await ensureConfig();
     const { reviewCommand } = await import('./commands/review');
@@ -98,7 +98,7 @@ program
 
 program
   .command('start <ticketId>')
-  .description('Full workflow: branch → push → PR → set to In Review')
+  .description('Full workflow: branch → push → PR → set to Ready for Review')
   .action(async (ticketId: string) => {
     await ensureConfig();
     const { startCommand } = await import('./commands/start');

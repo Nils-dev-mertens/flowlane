@@ -2,6 +2,8 @@ export interface Ticket {
   id: string;
   title: string;
   status: string;
+  /** Board column name (may differ from the workflow state). */
+  boardColumn?: string;
   type?: string;
   url?: string;
   assignee?: string;
@@ -29,6 +31,18 @@ export interface FlowlaneConfig {
   user: string;
   baseBranch?: string;
   baseUrl?: string;
+  /** Azure DevOps team name (used to read board columns). */
+  team?: string;
+  /** System.State value set when starting work (e.g. "Active"). */
+  activeStatus?: string;
+  /** System.BoardColumn value set when starting work (e.g. "Doing"). */
+  activeColumn?: string;
+  /** System.State value set when moving to review (e.g. "Active"). */
+  reviewStatus?: string;
+  /** System.BoardColumn value set when moving to review (e.g. "Ready for Review"). */
+  reviewColumn?: string;
+  /** Comma-separated list of states considered closed/done (excluded from ticket listing). */
+  closedStates?: string;
 }
 
 export interface CreatePRParams {

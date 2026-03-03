@@ -11,23 +11,32 @@ const TICKET_FIELDS = [
   'System.Id',
   'System.Title',
   'System.State',
+  'System.BoardColumn',
   'System.WorkItemType',
   'System.AssignedTo',
   'System.TeamProject',
 ];
 
-const CLOSED_STATES = ['Done', 'Removed', 'Closed', 'Resolved'];
+const DEFAULT_CLOSED_STATES = ['Done', 'Removed', 'Closed', 'Resolved'];
 
 @injectable()
 export class AzureDevOpsTicketService implements ITicketService {
   private readonly connection: azdev.WebApi;
   private readonly project: string;
+  private readonly closedStates: string[];
   private witApi: IWorkItemTrackingApi | null = null;
+  /** Cached WEF field name for the board column (e.g. "WEF_xxx_Kanban.Column"). */
+  private boardColumnField: string | null | undefined = undefined; // undefined = not yet fetched
 
   constructor(@inject(TOKENS.ConfigService) private readonly config: IConfigService) {
     const token = config.get<string>('token')!;
     const org   = config.get<string>('org')!;
     this.project = config.get<string>('project')!;
+
+    const closedRaw = config.get<string>('closedStates');
+    this.closedStates = closedRaw
+      ? closedRaw.split(',').map((s) => s.trim()).filter(Boolean)
+      : DEFAULT_CLOSED_STATES;
 
     const authHandler = azdev.getPersonalAccessTokenHandler(token);
     this.connection   = new azdev.WebApi(`https://dev.azure.com/${org}`, authHandler);
@@ -53,7 +62,7 @@ export class AzureDevOpsTicketService implements ITicketService {
 
     // Use single-quotes inside WIQL; escape any single-quotes in the user string.
     const safeUser = user.replace(/'/g, "''");
-    const notClosed = CLOSED_STATES.map((s) => `'${s}'`).join(', ');
+    const notClosed = this.closedStates.map((s) => `'${s}'`).join(', ');
 
     const wiql = {
       query: `
@@ -88,13 +97,26 @@ export class AzureDevOpsTicketService implements ITicketService {
     return (workItems ?? []).filter(Boolean).map((wi) => this.map(wi));
   }
 
-  async updateStatus(id: string, status: string): Promise<void> {
+  async updateStatus(id: string, state: string, boardColumn?: string): Promise<void> {
     const api = await this.api();
-    const patch = [
-      { op: 'add', path: '/fields/System.State', value: status },
+    const patch: { op: string; path: string; value: string }[] = [
+      { op: 'add', path: '/fields/System.State', value: state },
     ];
-    // SDK signature: updateWorkItem(customHeaders, document, id, project?, ...)
-    await api.updateWorkItem({}, patch, parseInt(id, 10), this.project);
+
+    if (boardColumn) {
+      // System.BoardColumn is read-only. The writable field is a team-specific
+      // WEF_{guid}_Kanban.Column field — fetch it once from the board definition.
+      const columnField = await this.getBoardColumnField();
+      if (columnField) {
+        patch.push({ op: 'add', path: `/fields/${columnField}`, value: boardColumn });
+      }
+    }
+
+    try {
+      await api.updateWorkItem({}, patch, parseInt(id, 10), this.project);
+    } catch (err: unknown) {
+      throw new Error(extractApiError(err));
+    }
   }
 
   // ── helpers ────────────────────────────────────────────────────────────────
@@ -106,16 +128,68 @@ export class AzureDevOpsTicketService implements ITicketService {
     return this.witApi;
   }
 
+  /**
+   * Returns the team-specific writable field for the board column
+   * (e.g. "WEF_abc123_Kanban.Column"). Fetched once and cached.
+   * Returns null if the team is not configured or the board can't be reached.
+   */
+  private async getBoardColumnField(): Promise<string | null> {
+    if (this.boardColumnField !== undefined) return this.boardColumnField;
+
+    const team = this.config.get<string>('team');
+    if (!team) {
+      this.boardColumnField = null;
+      return null;
+    }
+
+    try {
+      const workApi     = await this.connection.getWorkApi();
+      const teamContext = { project: this.project, team };
+      const boards      = await workApi.getBoards(teamContext);
+      if (!boards || boards.length === 0) {
+        this.boardColumnField = null;
+        return null;
+      }
+      const board = await workApi.getBoard(teamContext, boards[0].id!);
+      this.boardColumnField = board.fields?.columnField?.referenceName ?? null;
+    } catch {
+      this.boardColumnField = null;
+    }
+
+    return this.boardColumnField;
+  }
+
   private map(wi: WorkItem): Ticket {
     const f = wi.fields ?? {};
     const assignee = f['System.AssignedTo'];
     return {
-      id:       String(wi.id),
-      title:    f['System.Title']      ?? '(No title)',
-      status:   f['System.State']      ?? 'Unknown',
-      type:     f['System.WorkItemType'],
-      url:      (wi._links as Record<string, { href: string }> | undefined)?.html?.href,
-      assignee: typeof assignee === 'object' ? assignee?.displayName : assignee,
+      id:          String(wi.id),
+      title:       f['System.Title']       ?? '(No title)',
+      status:      f['System.State']       ?? 'Unknown',
+      boardColumn: f['System.BoardColumn'] as string | undefined,
+      type:        f['System.WorkItemType'],
+      url:         (wi._links as Record<string, { href: string }> | undefined)?.html?.href,
+      assignee:    typeof assignee === 'object' ? assignee?.displayName : assignee,
     };
   }
+}
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Azure DevOps API errors come back as JSON in the response body, e.g.:
+ *   { "message": "VS402903: Work item type Task does not have a state 'X'. Valid states are: ..." }
+ * The SDK surfaces this as an Error whose message may be a raw JSON string.
+ * This helper unwraps the most useful human-readable text.
+ */
+function extractApiError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+  const raw = err.message;
+  try {
+    const parsed = JSON.parse(raw) as { message?: string };
+    if (typeof parsed.message === 'string' && parsed.message) return parsed.message;
+  } catch {
+    // not JSON — use as-is
+  }
+  return raw;
 }
