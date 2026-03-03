@@ -3,6 +3,7 @@ import chalk from 'chalk';
 import { container } from '../container';
 import { TOKENS } from '../tokens';
 import { ConfigService } from '../config/ConfigService';
+import { detectFromGit } from '../utils/gitDetect';
 import type { FlowlaneConfig } from '../types';
 
 // ── profile list ──────────────────────────────────────────────────────────────
@@ -68,7 +69,19 @@ export function profileRemoveCommand(name: string): void {
 export async function profileAddCommand(nameArg?: string): Promise<void> {
   p.intro(chalk.bgCyan.black('  flowlane profile add  '));
 
-  const cfg = container.resolve<ConfigService>(TOKENS.ConfigService);
+  const cfg      = container.resolve<ConfigService>(TOKENS.ConfigService);
+  const detected = detectFromGit();
+
+  if (detected.detected) {
+    const fields: string[] = [];
+    if (detected.platform) fields.push(`platform: ${detected.platform}`);
+    if (detected.org)      fields.push(`org: ${detected.org}`);
+    if (detected.project)  fields.push(`project: ${detected.project}`);
+    if (detected.repo)     fields.push(`repo: ${detected.repo}`);
+    if (detected.baseBranch) fields.push(`baseBranch: ${detected.baseBranch}`);
+    if (detected.user)     fields.push(`user: ${detected.user}`);
+    p.note(fields.join('\n'), 'Auto-detected from git remote');
+  }
 
   // ── Profile name ──────────────────────────────────────────────────────────
 
@@ -76,7 +89,7 @@ export async function profileAddCommand(nameArg?: string): Promise<void> {
   if (!profileName) {
     const input = await p.text({
       message: 'Profile name:',
-      placeholder: 'work',
+      placeholder: detected.org ?? 'work',
       validate: (v) => {
         if (!v.trim()) return 'Required';
         if (!/^[\w-]+$/.test(v.trim())) return 'Use only letters, numbers, hyphens, underscores';
@@ -99,6 +112,7 @@ export async function profileAddCommand(nameArg?: string): Promise<void> {
 
   const platform = await p.select({
     message: 'Platform:',
+    initialValue: detected.platform ?? 'azuredevops',
     options: [
       { value: 'azuredevops', label: 'Azure DevOps', hint: 'dev.azure.com' },
       { value: 'jira',        label: 'Jira (stub)',  hint: 'atlassian.net' },
@@ -111,6 +125,7 @@ export async function profileAddCommand(nameArg?: string): Promise<void> {
   const org = await p.text({
     message: platform === 'azuredevops' ? 'Azure DevOps organization:' : 'Jira subdomain:',
     placeholder: 'my-company',
+    initialValue: detected.org ?? '',
     validate: (v) => v.trim() ? undefined : 'Required',
   }) as string;
   if (p.isCancel(org)) { p.cancel('Cancelled.'); return; }
@@ -120,6 +135,7 @@ export async function profileAddCommand(nameArg?: string): Promise<void> {
   const project = await p.text({
     message: 'Default project name:',
     placeholder: 'MyProject',
+    initialValue: detected.project ?? '',
     validate: (v) => v.trim() ? undefined : 'Required',
   }) as string;
   if (p.isCancel(project)) { p.cancel('Cancelled.'); return; }
@@ -129,6 +145,7 @@ export async function profileAddCommand(nameArg?: string): Promise<void> {
   const repoInput = await p.text({
     message: 'Default repository name (leave blank to use project name):',
     placeholder: project.trim(),
+    initialValue: detected.repo ?? '',
   }) as string;
   if (p.isCancel(repoInput)) { p.cancel('Cancelled.'); return; }
   const repo = repoInput?.trim() || project.trim();
@@ -151,6 +168,7 @@ export async function profileAddCommand(nameArg?: string): Promise<void> {
   const user = await p.text({
     message: 'Your username / email (used to fetch assigned tickets):',
     placeholder: platform === 'azuredevops' ? 'jane@company.com' : 'jane@atlassian.net',
+    initialValue: detected.user ?? '',
     validate: (v) => v.trim() ? undefined : 'Required',
   }) as string;
   if (p.isCancel(user)) { p.cancel('Cancelled.'); return; }
@@ -160,7 +178,7 @@ export async function profileAddCommand(nameArg?: string): Promise<void> {
   const baseBranch = await p.text({
     message: 'Default base branch for pull requests:',
     placeholder: 'main',
-    defaultValue: 'main',
+    initialValue: detected.baseBranch ?? 'main',
   }) as string;
   if (p.isCancel(baseBranch)) { p.cancel('Cancelled.'); return; }
 
@@ -196,14 +214,21 @@ export async function profileInitLocalCommand(): Promise<void> {
 
   const cfg      = container.resolve<ConfigService>(TOKENS.ConfigService);
   const profiles = cfg.listProfiles();
+  const detected = detectFromGit();
 
   if (profiles.length === 0) {
     p.cancel('No profiles found. Run `flowlane init` first.');
     return;
   }
 
+  // Try to guess the best matching profile from the detected org
+  const defaultProfile = detected.org
+    ? (profiles.find((n) => cfg.getProfile(n)?.org === detected.org) ?? profiles[0])
+    : profiles[0];
+
   const chosenProfile = await p.select({
     message: 'Which profile should this repo use?',
+    initialValue: defaultProfile,
     options: profiles.map((name) => {
       const pr = cfg.getProfile(name)!;
       return { value: name, label: name, hint: `${pr.org ?? ''} · ${pr.project ?? ''}` };
@@ -213,28 +238,32 @@ export async function profileInitLocalCommand(): Promise<void> {
 
   const profile = cfg.getProfile(chosenProfile)!;
 
-  // Optional per-repo overrides
+  // Optional per-repo overrides — pre-fill with git-detected values when available
   const projectOverride = await p.text({
     message: 'Project name for this repo (leave blank to keep profile default):',
     placeholder: profile.project ?? '',
+    initialValue: detected.project && detected.project !== profile.project ? detected.project : '',
   }) as string;
   if (p.isCancel(projectOverride)) { p.cancel('Cancelled.'); return; }
 
   const repoOverride = await p.text({
     message: 'Repository name for this repo (leave blank to keep profile default):',
     placeholder: profile.repo ?? profile.project ?? '',
+    initialValue: detected.repo && detected.repo !== profile.repo ? detected.repo : '',
   }) as string;
   if (p.isCancel(repoOverride)) { p.cancel('Cancelled.'); return; }
 
   const userOverride = await p.text({
     message: 'User identity for this repo (leave blank to keep profile default):',
     placeholder: profile.user ?? '',
+    initialValue: detected.user && detected.user !== profile.user ? detected.user : '',
   }) as string;
   if (p.isCancel(userOverride)) { p.cancel('Cancelled.'); return; }
 
   const baseBranchOverride = await p.text({
     message: 'Base branch for this repo (leave blank to keep profile default):',
     placeholder: profile.baseBranch ?? 'main',
+    initialValue: detected.baseBranch && detected.baseBranch !== profile.baseBranch ? detected.baseBranch : '',
   }) as string;
   if (p.isCancel(baseBranchOverride)) { p.cancel('Cancelled.'); return; }
 
