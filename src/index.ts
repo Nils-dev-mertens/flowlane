@@ -8,10 +8,12 @@ import 'reflect-metadata';
 
 import { Command } from 'commander';
 import chalk from 'chalk';
+import { execSync } from 'child_process';
 
 import { setupContainer, container } from './container';
 import { TOKENS }                    from './tokens';
 import type { IConfigService }       from './services/interfaces/IConfigService';
+import { ticketIdFromBranch }        from './utils/branch';
 
 // Bootstrap the DI container once, before any command runs.
 setupContainer();
@@ -64,13 +66,14 @@ program
 // ── pr ────────────────────────────────────────────────────────────────────────
 
 program
-  .command('pr <ticketId>')
-  .description('Create a pull request and link the work item')
-  .action(async (ticketId: string) => {
+  .command('pr [ticketId]')
+  .description('Create a pull request and link the work item (defaults to current branch ticket)')
+  .action(async (ticketId?: string) => {
     await ensureConfig();
+    const id = resolveTicketId(ticketId);
     const { prCommand } = await import('./commands/pr');
     try {
-      await prCommand(ticketId);
+      await prCommand(id);
     } catch (err: unknown) {
       console.error(chalk.red(`Error: ${errMsg(err)}`));
       process.exit(1);
@@ -80,14 +83,15 @@ program
 // ── review ────────────────────────────────────────────────────────────────────
 
 program
-  .command('review <ticketId>')
-  .description('Set a ticket status to "Ready for Review"')
+  .command('review [ticketId]')
+  .description('Set a ticket status to "Ready for Review" (defaults to current branch ticket)')
   .option('--status <status>', 'Custom status string to set', 'Ready for Review')
-  .action(async (ticketId: string, opts: { status: string }) => {
+  .action(async (ticketId: string | undefined, opts: { status: string }) => {
     await ensureConfig();
+    const id = resolveTicketId(ticketId);
     const { reviewCommand } = await import('./commands/review');
     try {
-      await reviewCommand(ticketId, { status: opts.status });
+      await reviewCommand(id, { status: opts.status });
     } catch (err: unknown) {
       console.error(chalk.red(`Error: ${errMsg(err)}`));
       process.exit(1);
@@ -98,7 +102,7 @@ program
 
 program
   .command('start <ticketId>')
-  .description('Full workflow: branch → push → PR → set to Ready for Review')
+  .description('Full workflow: set ticket active → create branch → push')
   .action(async (ticketId: string) => {
     await ensureConfig();
     const { startCommand } = await import('./commands/start');
@@ -214,4 +218,33 @@ async function ensureConfig(): Promise<void> {
 
 function errMsg(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * Resolves a ticket ID — uses the provided value if given, otherwise
+ * attempts to parse it from the current git branch name.
+ * Exits with an error if neither source yields an ID.
+ */
+function resolveTicketId(ticketId?: string): string {
+  if (ticketId) return ticketId;
+
+  let branch: string;
+  try {
+    branch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8', stdio: 'pipe' }).trim();
+  } catch {
+    console.error(chalk.red('Could not determine current branch. Pass a ticket ID explicitly.'));
+    process.exit(1);
+  }
+
+  const id = ticketIdFromBranch(branch);
+  if (!id) {
+    console.error(
+      chalk.red(`Could not parse a ticket ID from branch "${branch}".`) +
+      `\nPass a ticket ID explicitly: ${chalk.cyan('flowlane pr <ticketId>')}`,
+    );
+    process.exit(1);
+  }
+
+  console.log(chalk.dim(`Using ticket ${chalk.cyan(id)} from branch "${branch}"`));
+  return id;
 }
