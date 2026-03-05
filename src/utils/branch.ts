@@ -2,8 +2,8 @@
  * Generates a git branch name from a ticket ID and title.
  *
  * Examples:
- *   generateBranchName('123',      'Fix login button')   → 'feature/123-fix-login-button'
- *   generateBranchName('PROJ-456', 'Add dark mode')      → 'feature/proj-456-add-dark-mode'
+ *   generateBranchName('123',      'Fix login button')   → '123-fix-login-button'
+ *   generateBranchName('PROJ-456', 'Add dark mode')      → 'proj-456-add-dark-mode'
  */
 export function generateBranchName(ticketId: string, title: string): string {
   const slug = title
@@ -16,5 +16,5 @@ export function generateBranchName(ticketId: string, title: string): string {
     .slice(0, 50);              // cap length
 
   const idPart = ticketId.toLowerCase().replace(/\s+/g, '-');
-  return `feature/${idPart}-${slug}`;
+  return `${idPart}-${slug}`;
 }

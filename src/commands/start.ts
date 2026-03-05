@@ -2,12 +2,9 @@ import * as p from '@clack/prompts';
 import chalk from 'chalk';
 import { container } from '../container';
 import { TOKENS }    from '../tokens';
-import { offerColumnFix } from '../utils/boardStatusFix';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { ITicketService } from '../services/interfaces/ITicketService';
 import { branchCommand } from './branch';
-import { prCommand }     from './pr';
-import { reviewCommand } from './review';
 
 export interface StartOptions {
   /** Called from an interactive TUI session (skip self-contained intro). */
@@ -15,7 +12,8 @@ export interface StartOptions {
 }
 
 /**
- * Full workflow: create branch → push → open PR → set ticket to Ready for Review.
+ * Full workflow: set ticket active → create branch → push.
+ * PR creation is left to the user once the work is ready.
  */
 export async function startCommand(
   ticketId: string,
@@ -27,39 +25,19 @@ export async function startCommand(
     p.intro(chalk.bgCyan.black('  flowlane start  ') + chalk.dim(`  Ticket ${ticketId}`));
   }
 
-  p.log.step(`Starting full workflow for ${chalk.cyan(ticketId)}…`);
+  p.log.step(`Starting workflow for ${chalk.cyan(ticketId)}…`);
 
-  // ── Step 0: move ticket to "active / doing" column ───────────────────────
+  // ── Step 0: set ticket state to active (no column change) ────────────────
 
-  const cfg        = container.resolve<IConfigService>(TOKENS.ConfigService);
-  const ticketSvc  = container.resolve<ITicketService>(TOKENS.TicketService);
-  let activeState  = cfg.get<string>('activeStatus') ?? '';
-  let activeColumn = cfg.get<string>('activeColumn');
+  const cfg       = container.resolve<IConfigService>(TOKENS.ConfigService);
+  const ticketSvc = container.resolve<ITicketService>(TOKENS.TicketService);
+  const activeState = cfg.get<string>('activeStatus') ?? 'Active';
 
-  if (activeState || activeColumn) {
-    let label = activeColumn ?? activeState;
-    let done  = false;
-
-    while (!done) {
-      try {
-        await ticketSvc.updateStatus(ticketId, activeState, activeColumn);
-        p.log.success(`Ticket moved to "${chalk.yellow(label)}".`);
-        done = true;
-      } catch (err: unknown) {
-        p.log.warn(`Could not move ticket to "${label}": ${errMsg(err)}`);
-        const fix = await offerColumnFix(cfg, {
-          message:   'Which column means you\'re actively working on a ticket?',
-          stateKey:  'activeStatus',
-          columnKey: 'activeColumn',
-        });
-        if (!fix) { done = true; break; }  // skip and continue workflow
-        await cfg.set('activeStatus', fix.state);
-        await cfg.set('activeColumn', fix.column);
-        activeState  = fix.state;
-        activeColumn = fix.column;
-        label        = fix.column;
-      }
-    }
+  try {
+    await ticketSvc.updateStatus(ticketId, activeState, undefined);
+    p.log.success(`Ticket state set to "${chalk.yellow(activeState)}".`);
+  } catch (err: unknown) {
+    p.log.warn(`Could not update ticket state: ${errMsg(err)}`);
   }
 
   // ── Step 1: branch ────────────────────────────────────────────────────────
@@ -74,38 +52,12 @@ export async function startCommand(
     process.exit(1);
   }
 
-  // ── Step 2: PR ────────────────────────────────────────────────────────────
-
-  let pr;
-  try {
-    pr = await prCommand(ticketId, { interactive, sourceBranch: branchName });
-  } catch (err: unknown) {
-    const msg = errMsg(err);
-    if (msg === 'Cancelled') {
-      p.outro(`Workflow cancelled. Branch ${chalk.green(branchName)} was created.`);
-      return;
-    }
-    p.outro(chalk.red(`PR step failed: ${msg}`));
-    process.exit(1);
-  }
-
-  // ── Step 3: set to review (non-fatal) ─────────────────────────────────────
-
-  try {
-    await reviewCommand(ticketId, { interactive });
-  } catch (err: unknown) {
-    const msg = errMsg(err);
-    if (msg !== 'Cancelled') {
-      p.log.warn(`Could not update ticket status: ${msg}`);
-    }
-  }
-
   // ── Done ──────────────────────────────────────────────────────────────────
 
   p.outro(
-    `${chalk.green('✓ Workflow complete!')}\n` +
+    `${chalk.green('✓ Branch ready!')}\n` +
     `  Branch: ${chalk.green(branchName)}\n` +
-    `  PR:     ${chalk.blue.underline(pr.url)}`,
+    `  Run ${chalk.cyan('flowlane pr ' + ticketId)} when you're ready to open a PR.`,
   );
 }
 
