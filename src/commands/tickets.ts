@@ -1,8 +1,10 @@
 import * as p from '@clack/prompts';
 import chalk from 'chalk';
+import { execSync } from 'child_process';
 import { container } from '../container';
 import { TOKENS } from '../tokens';
 import { fetchBoardColumns } from '../utils/azureBoard';
+import { ticketIdFromBranch } from '../utils/branch';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { ITicketService } from '../services/interfaces/ITicketService';
 import type { Ticket } from '../types';
@@ -66,10 +68,22 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
     return;
   }
 
+  // ── Detect current branch ticket ──────────────────────────────────────────
+
+  let branchTicketId: string | undefined;
+  try {
+    const branch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8', stdio: 'pipe' }).trim();
+    branchTicketId = ticketIdFromBranch(branch) ?? undefined;
+    if (branchTicketId) {
+      p.log.info(`Current branch: ticket ${chalk.cyan(branchTicketId)}`);
+    }
+  } catch { /* not in a git repo */ }
+
   // ── Ticket picker ─────────────────────────────────────────────────────────
 
   const ticketId = await p.select({
     message: `Select a ticket  ${chalk.dim(`(${filtered.length} shown)`)}:`,
+    initialValue: filtered.some((t) => t.id === branchTicketId) ? branchTicketId : undefined,
     options: filtered.map((t) => ({
       value: t.id,
       label: `${chalk.cyan(t.id.padEnd(10))} ${truncate(t.title, 58)}`,
@@ -101,13 +115,10 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
   // ── Action picker ─────────────────────────────────────────────────────────
 
   const activeLabel = cfg.get<string>('activeColumn') ?? cfg.get<string>('activeStatus');
-  const reviewLabel = cfg.get<string>('reviewColumn') ?? cfg.get<string>('reviewStatus') ?? 'Ready for Review';
   const startHint   = [
     activeLabel ? `set to ${activeLabel}` : null,
     'create branch',
     'push',
-    'open PR',
-    `set to ${reviewLabel}`,
   ].filter(Boolean).join(' → ');
 
   const action = await p.select({

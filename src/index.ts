@@ -71,6 +71,11 @@ program
   .action(async (ticketId?: string) => {
     await ensureConfig();
     const id = resolveTicketId(ticketId);
+    if (!id) {
+      const { ticketsCommand } = await import('./commands/tickets');
+      await ticketsCommand({});
+      return;
+    }
     const { prCommand } = await import('./commands/pr');
     try {
       await prCommand(id);
@@ -85,10 +90,15 @@ program
 program
   .command('review [ticketId]')
   .description('Set a ticket status to "Ready for Review" (defaults to current branch ticket)')
-  .option('--status <status>', 'Custom status string to set', 'Ready for Review')
-  .action(async (ticketId: string | undefined, opts: { status: string }) => {
+  .option('--status <status>', 'Custom status string to set')
+  .action(async (ticketId: string | undefined, opts: { status?: string }) => {
     await ensureConfig();
     const id = resolveTicketId(ticketId);
+    if (!id) {
+      const { ticketsCommand } = await import('./commands/tickets');
+      await ticketsCommand({});
+      return;
+    }
     const { reviewCommand } = await import('./commands/review');
     try {
       await reviewCommand(id, { status: opts.status });
@@ -223,28 +233,21 @@ function errMsg(err: unknown): string {
 /**
  * Resolves a ticket ID — uses the provided value if given, otherwise
  * attempts to parse it from the current git branch name.
- * Exits with an error if neither source yields an ID.
+ * Returns null if the branch doesn't contain a ticket ID (caller falls back to interactive flow).
  */
-function resolveTicketId(ticketId?: string): string {
+function resolveTicketId(ticketId?: string): string | null {
   if (ticketId) return ticketId;
 
   let branch: string;
   try {
     branch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8', stdio: 'pipe' }).trim();
   } catch {
-    console.error(chalk.red('Could not determine current branch. Pass a ticket ID explicitly.'));
-    process.exit(1);
+    return null;
   }
 
   const id = ticketIdFromBranch(branch);
-  if (!id) {
-    console.error(
-      chalk.red(`Could not parse a ticket ID from branch "${branch}".`) +
-      `\nPass a ticket ID explicitly: ${chalk.cyan('flowlane pr <ticketId>')}`,
-    );
-    process.exit(1);
+  if (id) {
+    console.log(chalk.dim(`Using ticket ${chalk.cyan(id)} from branch "${branch}"`));
   }
-
-  console.log(chalk.dim(`Using ticket ${chalk.cyan(id)} from branch "${branch}"`));
   return id;
 }
