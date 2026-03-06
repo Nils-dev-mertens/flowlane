@@ -1,79 +1,245 @@
 # flowlane
 
-> **Ticket → Branch → PR** — Agile board workflow automation for the command line.
+**Ticket → Branch → PR** — command-line workflow automation for Azure DevOps Boards.
 
-Build a TypeScript CLI tool that automates the daily developer workflow from agile board item to pull request. Platform-agnostic, designed to support Azure DevOps Boards and Jira.
-
----
-
-## Name
-
-| Candidate | Rationale |
-|-----------|-----------|
-| **flowlane** ✓ | Kanban *lanes* + forward *flow*; short, vendor-agnostic |
-| `tickflow` | Ticket pipeline |
-| `kanrun` | Kanban + run/execute |
-| `swimlane` | Classic kanban term |
-| `boardctl` | Board control, kubectl-style |
-
-`flowlane` chosen: lane-progression metaphor, no vendor reference, works as a CLI command.
+flowlane bridges your Azure DevOps board and your local git workflow. Instead of switching between a browser, terminal, and IDE to manage tickets, create branches, and update statuses, flowlane lets you do all of that from a single CLI.
 
 ---
 
-## Core workflow
+## What it does
 
-`view ticket → create branch → push → open PR → link work item → set ticket to "Ready for Review"`
+When you pick up a ticket, flowlane handles the full handoff automatically:
+
+- Moves the ticket to the correct board column (e.g. "Doing")
+- Creates a branch named after the ticket ID and title
+- Pushes the branch to remote
+
+When the work is ready:
+
+- Creates the pull request and links it to the work item
+- Moves the ticket to the configured review column (e.g. "Ready for Review")
+
+At any point you can open the interactive picker (`flowlane`) to browse your assigned tickets, see their current board column, and move them to any column on the board without touching the Azure DevOps UI.
+
+If you're already on a ticket branch (e.g. `1234-fix-login`), commands like `flowlane pr` and `flowlane review` automatically detect the ticket from the branch name — no need to type the ID.
+
+---
+
+## Prerequisites
+
+- **Node.js** 18 or later
+- **git** installed and on your `PATH`
+- An **Azure DevOps Personal Access Token** with the following scopes:
+  - Work Items — Read & Write
+  - Code — Read & Write
+  - Pull Request Threads — Read & Write
+
+---
+
+## Installation
+
+```bash
+# 1. Clone the repository
+git clone <repo-url>
+cd flowlane
+
+# 2. Install dependencies
+npm install
+
+# 3. Build
+npm run build
+
+# 4. Link globally so the `flowlane` command is available everywhere
+npm link
+```
+
+To verify the installation:
+
+```bash
+flowlane --version
+```
+
+---
+
+## First-time setup
+
+Run the interactive setup wizard:
+
+```bash
+flowlane init
+```
+
+This will ask for your platform, organisation, project, token, and user identity, then save everything to `~/.config/flowlane/config.json`.
+
+For per-repository overrides (e.g. a different profile or base branch), run:
+
+```bash
+flowlane profile local
+```
+
+This creates a `.flowlane` file in the current directory that takes precedence over the global profile.
 
 ---
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `flowlane` | Alias for `flowlane tickets` |
-| `flowlane tickets [--user <u>]` | Interactive TUI ticket picker |
-| `flowlane branch <ticketId>` | Fetch ticket, generate branch name, create & push |
-| `flowlane pr <ticketId>` | Create PR and link work item |
-| `flowlane review <ticketId> [--status <s>]` | Set ticket status (default: *Ready for Review*) |
-| `flowlane start <ticketId>` | Full workflow: branch → PR → review |
-| `flowlane init` | Interactive setup wizard |
-| `flowlane config get <key>` | Print one config value |
-| `flowlane config set <key> <value>` | Update a config value |
-| `flowlane config list` | Print all config values |
+### Default — interactive ticket picker
+
+```bash
+flowlane
+# or
+flowlane tickets
+flowlane tickets --user jane.doe@company.com
+```
+
+Opens a TUI that lists your open tickets, lets you filter them, and offers actions: move to a column, start the full workflow, create a branch, or open a PR.
 
 ---
 
-## Interactive TUI (`@clack/prompts`)
+### `flowlane start <ticketId>`
 
-Triggered by `flowlane tickets` or any command run without arguments:
+Full workflow in one command:
 
-- Styled header showing configured project and current user
-- Searchable/filterable list of open tickets assigned to the user (id, title, status)
-- After selecting a ticket, action menu: create branch · create PR · set to review · view details · full start flow
-- Spinners during API calls
-- Clear success/error feedback with details (branch name, PR URL)
-- Keyboard navigation and ESC cancellation
+1. Sets the ticket state + board column to the configured "active" values
+2. Creates a branch named `<ticketId>-<title-slug>` and pushes it to origin
+
+```bash
+flowlane start 1234
+```
 
 ---
 
-## Configuration
+### `flowlane branch <ticketId>`
 
-Stored at `~/.config/flowlane/config.json`. Auto-created on first run via `init` wizard.
+Fetches the ticket, generates a branch name, creates the branch locally, and pushes it.
+
+```bash
+flowlane branch 1234
+```
+
+---
+
+### `flowlane pr [ticketId]`
+
+Creates a pull request linked to the work item. If no ticket ID is given, it is inferred from the current branch name. Falls back to the interactive picker if neither is available.
+
+```bash
+flowlane pr          # infer ticket from branch name
+flowlane pr 1234     # explicit ticket ID
+```
+
+> You must be on a git branch (not in a detached HEAD state) to create a PR.
+
+---
+
+### `flowlane review [ticketId]`
+
+Moves a ticket to the "Ready for Review" column (or a custom status via `--status`).
+
+```bash
+flowlane review          # infer ticket from branch name
+flowlane review 1234
+flowlane review 1234 --status "In Review"
+```
+
+---
+
+### `flowlane init`
+
+Runs the interactive setup wizard. If profiles already exist, offers to add a new one, configure a local repo override, or list existing profiles.
+
+---
+
+### `flowlane profile`
+
+Manage named profiles (each profile holds a separate set of credentials and project settings).
+
+```bash
+flowlane profile list           # list all profiles
+flowlane profile add [name]     # add a new profile
+flowlane profile use <name>     # switch the active profile
+flowlane profile remove <name>  # delete a profile
+flowlane profile local          # write a .flowlane file for the current repo
+```
+
+---
+
+### `flowlane config`
+
+Read or update individual config values in the active profile.
+
+```bash
+flowlane config list
+flowlane config get baseBranch
+flowlane config set baseBranch develop
+```
+
+---
+
+## Configuration reference
+
+Global config is stored at `~/.config/flowlane/config.json` and supports multiple named profiles. A `.flowlane` file in a repo root can override any value for that repo.
 
 | Key | Required | Description |
 |-----|----------|-------------|
-| `platform` | ✓ | `azuredevops` or `jira` |
-| `org` | ✓ | ADO org name or Jira subdomain |
-| `project` | ✓ | Project / board name |
-| `repo` | — | Git repo name (defaults to `project`) |
-| `token` | ✓ | PAT / API token |
-| `user` | ✓ | Email or display name |
-| `baseBranch` | — | PR target (default: `main`) |
-| `baseUrl` | — | Self-hosted ADO / Jira URL |
+| `platform` | ✓ | `azuredevops` (Jira support is planned) |
+| `org` | ✓ | Azure DevOps organisation name |
+| `project` | ✓ | Project name |
+| `token` | ✓ | Personal Access Token |
+| `user` | ✓ | Your email or display name (used to filter assigned tickets) |
+| `repo` | — | Git repository name. Defaults to `project` |
+| `baseBranch` | — | PR target branch. Defaults to `main` |
+| `team` | — | Azure DevOps team name. Required for board column operations |
+| `activeStatus` | — | `System.State` value set when starting work (e.g. `Active`) |
+| `activeColumn` | — | Board column set when starting work (e.g. `Doing`) |
+| `reviewStatus` | — | `System.State` value set on review (e.g. `Active`) |
+| `reviewColumn` | — | Board column set on review (e.g. `Ready for Review`) |
+| `closedStates` | — | Comma-separated states to exclude from ticket list (default: `Done,Removed,Closed,Resolved`) |
+| `baseUrl` | — | Self-hosted Azure DevOps URL |
 
-If config is missing, auto-run `init`. Validate required fields before API calls; provide actionable errors.
+### Example config (single profile)
 
-Azure DevOps PAT scopes: **Work Items** Read+Write · **Code** Read+Write · **Pull Request Threads** Read+Write
+```json
+{
+  "activeProfile": "work",
+  "profiles": {
+    "work": {
+      "platform": "azuredevops",
+      "org": "my-company",
+      "project": "MyProject",
+      "repo": "MyRepo",
+      "token": "<pat>",
+      "user": "jane.doe@my-company.com",
+      "baseBranch": "main",
+      "team": "MyProject Team",
+      "activeStatus": "Active",
+      "activeColumn": "Doing",
+      "reviewStatus": "Active",
+      "reviewColumn": "Ready for Review"
+    }
+  }
+}
+```
+
+### Example `.flowlane` (repo-level override)
+
+```json
+{
+  "profile": "work",
+  "repo": "some-other-repo",
+  "baseBranch": "develop"
+}
+```
+
+---
+
+## Development
+
+```bash
+npm run dev -- tickets     # run via ts-node without building
+npm run build              # compile TypeScript to dist/
+npm run build:watch        # watch mode
+```
 
 ---
 
@@ -81,89 +247,22 @@ Azure DevOps PAT scopes: **Work Items** Read+Write · **Code** Read+Write · **P
 
 ```
 src/
-├── index.ts              Entry point & Commander setup
-├── container.ts          tsyringe DI — lazy platform factories
+├── index.ts              Entry point & CLI command definitions
+├── container.ts          tsyringe DI — lazy platform service factories
 ├── tokens.ts             DI injection tokens
-├── types/index.ts        Shared domain types (Ticket, PR, …)
+├── types/index.ts        Shared types (Ticket, PullRequest, FlowlaneConfig, …)
 ├── config/
-│   └── ConfigService.ts  IConfigService — reads/writes config.json
+│   └── ConfigService.ts  Multi-profile config — reads/writes config.json
 ├── services/
-│   ├── interfaces/
-│   │   ├── IConfigService.ts   get<T>, set, exists, validate
-│   │   ├── ITicketService.ts   getTicket, getTicketsForUser, updateStatus
-│   │   ├── IGitService.ts      createBranch, publishBranch, getCurrentBranch
-│   │   └── IPRService.ts       createPR, linkWorkItem
-│   ├── azuredevops/
-│   │   ├── AzureDevOpsTicketService.ts   WIQL + work item updates
-│   │   └── AzureDevOpsPRService.ts       Git PR API + work item refs
-│   ├── jira/
-│   │   ├── JiraTicketService.ts   Stub
-│   │   └── JiraPRService.ts       Stub
-│   └── git/
-│       └── GitService.ts    Wraps `git` CLI via child_process
-├── commands/
-│   ├── init.ts       Setup wizard
-│   ├── tickets.ts    Interactive TUI picker
-│   ├── branch.ts     Branch creation flow
-│   ├── pr.ts         PR creation flow
-│   ├── review.ts     Status transition
-│   ├── start.ts      Orchestrates branch + pr + review
-│   └── config.ts     Config get/set/list
+│   ├── interfaces/       ITicketService, IPRService, IGitService, IConfigService
+│   ├── azuredevops/      Azure DevOps ticket + PR service implementations
+│   ├── jira/             Jira stubs (planned)
+│   └── git/              GitService — wraps git CLI via child_process
+├── commands/             One file per CLI command
 └── utils/
-    ├── branch.ts     generateBranchName() → feature/<id>-<slug>
-    └── display.ts    Chalk formatting helpers
+    ├── branch.ts         Branch name generation and ticket ID parsing
+    ├── azureBoard.ts     Fetch board columns via Azure DevOps Work API
+    └── boardStatusFix.ts Interactive recovery when a status update fails
 ```
 
-### Dependency injection
-
-Use `tsyringe` with `instanceCachingFactory` (lazy singletons). Register services in `src/container.ts` based on `platform` from config. Container is valid before `init` runs — factories read platform at resolution time, not registration time.
-
-To add a provider: implement the interfaces under `src/services/<provider>/`, add a `case` in the two factories in `container.ts`. No command changes needed.
-
----
-
-## Tech stack
-
-`typescript` · `commander` · `@clack/prompts` · `tsyringe` · `reflect-metadata` · `chalk` · `azure-devops-node-api`
-
-```json
-{
-  "compilerOptions": {
-    "target": "ES2020", "module": "CommonJS",
-    "experimentalDecorators": true, "emitDecoratorMetadata": true,
-    "strict": true, "esModuleInterop": true
-  }
-}
-```
-
----
-
-## Installation
-
-```bash
-git clone <repo> && cd flowlane
-bun install        # or npm install
-bun run build      # or npm run build
-npm link           # makes `flowlane` available globally
-```
-
-## Development
-
-```bash
-bun run dev -- tickets     # run via ts-node
-bun run build              # compile to dist/
-```
-
-## Example config
-
-```json
-{
-  "platform": "azuredevops",
-  "org": "my-company",
-  "project": "MyProject",
-  "repo": "MyRepo",
-  "token": "<pat>",
-  "user": "jane.doe@my-company.com",
-  "baseBranch": "main"
-}
-```
+To add a new platform: implement the interfaces under `src/services/<platform>/` and add a `case` in the two factories in `src/container.ts`. No changes to commands are needed.

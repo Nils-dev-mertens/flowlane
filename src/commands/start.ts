@@ -27,15 +27,17 @@ export async function startCommand(
 
   p.log.step(`Starting workflow for ${chalk.cyan(ticketId)}…`);
 
-  // ── Step 0: set ticket state to active (no column change) ────────────────
+  // ── Step 0: set ticket state + board column to active ────────────────────
 
-  const cfg       = container.resolve<IConfigService>(TOKENS.ConfigService);
-  const ticketSvc = container.resolve<ITicketService>(TOKENS.TicketService);
-  const activeState = cfg.get<string>('activeStatus') ?? 'Active';
+  const cfg          = container.resolve<IConfigService>(TOKENS.ConfigService);
+  const ticketSvc    = container.resolve<ITicketService>(TOKENS.TicketService);
+  const activeState  = cfg.get<string>('activeStatus') ?? 'Active';
+  const activeColumn = cfg.get<string>('activeColumn');
 
   try {
-    await ticketSvc.updateStatus(ticketId, activeState, undefined);
-    p.log.success(`Ticket state set to "${chalk.yellow(activeState)}".`);
+    await ticketSvc.updateStatus(ticketId, activeState, activeColumn);
+    const label = activeColumn ?? activeState;
+    p.log.success(`Ticket moved to "${chalk.yellow(label)}".`);
   } catch (err: unknown) {
     p.log.warn(`Could not update ticket state: ${errMsg(err)}`);
   }

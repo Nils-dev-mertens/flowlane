@@ -49,6 +49,12 @@ export async function prCommand(
     }
   }
 
+  if (!sourceBranch) {
+    throw new Error(
+      'Could not determine source branch. Make sure you are on a git branch before creating a PR.',
+    );
+  }
+
   // ── Fetch ticket ──────────────────────────────────────────────────────────
 
   const fetchSpinner = p.spinner();
@@ -89,7 +95,7 @@ export async function prCommand(
       ticketId,
       title:        ticket.title,
       description:  buildDescription(ticket.id, ticket.title, ticket.url),
-      sourceBranch: sourceBranch || 'HEAD',
+      sourceBranch,
       targetBranch,
     });
     prSpinner.stop(`PR #${pr.id} created.`);

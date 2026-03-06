@@ -33,6 +33,12 @@ export async function reviewCommand(
   // What the user sees on the board
   const displayLabel = column ?? state;
 
+  if (!state) {
+    throw new Error(
+      'No review status configured. Run: flowlane config set reviewStatus "<state>"',
+    );
+  }
+
   if (!interactive) {
     p.intro(chalk.bgCyan.black('  flowlane review  ') + chalk.dim(`  Ticket ${ticketId}`));
   }

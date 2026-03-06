@@ -187,7 +187,13 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
       const moveSpinner = p.spinner();
       moveSpinner.start(`Moving ticket to "${chalk.yellow(pick)}"…`);
       try {
-        await ticketSvc.updateStatus(ticketId as string, col.states[0] ?? '', pick);
+        const colState = col.states[0];
+        if (!colState) {
+          moveSpinner.stop(chalk.red(`Column "${pick}" has no state mapping.`));
+          p.outro(chalk.red(`Column "${pick}" has no state mapping. Configure it in Azure DevOps.`));
+          break;
+        }
+        await ticketSvc.updateStatus(ticketId as string, colState, pick);
         moveSpinner.stop(`Ticket ${chalk.cyan(ticketId as string)} → ${chalk.yellow(pick)}`);
         p.outro(`${chalk.green('✓')} Ticket moved to "${chalk.yellow(pick)}".`);
       } catch (err: unknown) {
