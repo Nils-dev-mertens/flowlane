@@ -6,22 +6,17 @@ flowlane bridges your Azure DevOps board and your local git workflow. Instead of
 
 ---
 
-## What it does
+## Installation
 
-When you pick up a ticket, flowlane handles the full handoff automatically:
+```bash
+npm install -g flowlane
+```
 
-- Moves the ticket to the correct board column (e.g. "Doing")
-- Creates a branch named after the ticket ID and title
-- Pushes the branch to remote
+Verify:
 
-When the work is ready:
-
-- Creates the pull request and links it to the work item
-- Moves the ticket to the configured review column (e.g. "Ready for Review")
-
-At any point you can open the interactive picker (`flowlane`) to browse your assigned tickets, see their current board column, and move them to any column on the board without touching the Azure DevOps UI.
-
-If you're already on a ticket branch (e.g. `1234-fix-login`), commands like `flowlane pr` and `flowlane review` automatically detect the ticket from the branch name — no need to type the ID.
+```bash
+flowlane --version
+```
 
 ---
 
@@ -33,31 +28,6 @@ If you're already on a ticket branch (e.g. `1234-fix-login`), commands like `flo
   - Work Items — Read & Write
   - Code — Read & Write
   - Pull Request Threads — Read & Write
-
----
-
-## Installation
-
-```bash
-# 1. Clone the repository
-git clone <repo-url>
-cd flowlane
-
-# 2. Install dependencies
-npm install
-
-# 3. Build
-npm run build
-
-# 4. Link globally so the `flowlane` command is available everywhere
-npm link
-```
-
-To verify the installation:
-
-```bash
-flowlane --version
-```
 
 ---
 
@@ -233,36 +203,12 @@ Global config is stored at `~/.config/flowlane/config.json` and supports multipl
 
 ---
 
-## Development
+## Contributing
 
-```bash
-npm run dev -- tickets     # run via ts-node without building
-npm run build              # compile TypeScript to dist/
-npm run build:watch        # watch mode
-```
+See [DEVELOPMENT.md](./DEVELOPMENT.md) for local setup, architecture, and contribution guidelines.
 
 ---
 
-## Architecture
+## License
 
-```
-src/
-├── index.ts              Entry point & CLI command definitions
-├── container.ts          tsyringe DI — lazy platform service factories
-├── tokens.ts             DI injection tokens
-├── types/index.ts        Shared types (Ticket, PullRequest, FlowlaneConfig, …)
-├── config/
-│   └── ConfigService.ts  Multi-profile config — reads/writes config.json
-├── services/
-│   ├── interfaces/       ITicketService, IPRService, IGitService, IConfigService
-│   ├── azuredevops/      Azure DevOps ticket + PR service implementations
-│   ├── jira/             Jira stubs (planned)
-│   └── git/              GitService — wraps git CLI via child_process
-├── commands/             One file per CLI command
-└── utils/
-    ├── branch.ts         Branch name generation and ticket ID parsing
-    ├── azureBoard.ts     Fetch board columns via Azure DevOps Work API
-    └── boardStatusFix.ts Interactive recovery when a status update fails
-```
-
-To add a new platform: implement the interfaces under `src/services/<platform>/` and add a `case` in the two factories in `src/container.ts`. No changes to commands are needed.
+MIT
