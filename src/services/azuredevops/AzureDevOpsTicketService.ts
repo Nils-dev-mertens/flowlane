@@ -15,6 +15,7 @@ const TICKET_FIELDS = [
   'System.WorkItemType',
   'System.AssignedTo',
   'System.TeamProject',
+  'System.Parent',
 ];
 
 const DEFAULT_CLOSED_STATES = ['Done', 'Removed', 'Closed', 'Resolved'];
@@ -94,7 +95,39 @@ export class AzureDevOpsTicketService implements ITicketService {
       this.project,   // project — 6th param
     );
 
-    return (workItems ?? []).filter(Boolean).map((wi) => this.map(wi));
+    const assigned = (workItems ?? []).filter(Boolean).map((wi) => this.map(wi));
+
+    // Fetch parent work items (e.g. User Stories) for grouping context.
+    const assignedIds = new Set(assigned.map((t) => t.id));
+    const parentIds = [
+      ...new Set(
+        assigned
+          .map((t) => t.parentId)
+          .filter((id): id is string => !!id && !assignedIds.has(id)),
+      ),
+    ]
+      .map(Number)
+      .filter(Boolean);
+
+    if (parentIds.length === 0) return assigned;
+
+    try {
+      const parentItems = await api.getWorkItems(
+        parentIds,
+        TICKET_FIELDS,
+        undefined,
+        undefined,
+        undefined,
+        this.project,
+      );
+      const parents = (parentItems ?? [])
+        .filter(Boolean)
+        .map((wi) => ({ ...this.map(wi), isContext: true }));
+      return [...parents, ...assigned];
+    } catch {
+      // Parent fetch is best-effort; return assigned items without grouping context.
+      return assigned;
+    }
   }
 
   async updateStatus(id: string, state: string, boardColumn?: string): Promise<void> {
@@ -170,6 +203,7 @@ export class AzureDevOpsTicketService implements ITicketService {
       type:        f['System.WorkItemType'],
       url:         (wi._links as Record<string, { href: string }> | undefined)?.html?.href,
       assignee:    typeof assignee === 'object' ? assignee?.displayName : assignee,
+      parentId:    f['System.Parent'] != null ? String(f['System.Parent']) : undefined,
     };
   }
 }

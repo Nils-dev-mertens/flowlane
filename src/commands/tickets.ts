@@ -53,20 +53,34 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
 
   if (p.isCancel(filterRaw)) { p.outro('Cancelled.'); return; }
 
-  const filter   = (filterRaw ?? '').trim().toLowerCase();
-  const filtered = filter
-    ? tickets.filter(
+  const filter = (filterRaw ?? '').trim().toLowerCase();
+
+  // Filter only assigned (non-context) tickets; context parents are re-added as needed.
+  const assigned = tickets.filter((t) => !t.isContext);
+  const contextById = new Map(tickets.filter((t) => t.isContext).map((t) => [t.id, t]));
+
+  const filteredAssigned = filter
+    ? assigned.filter(
         (t) =>
           t.id.toLowerCase().includes(filter) ||
           t.title.toLowerCase().includes(filter) ||
           t.status.toLowerCase().includes(filter),
       )
-    : tickets;
+    : assigned;
 
-  if (filtered.length === 0) {
-    p.outro(chalk.yellow(`No tickets match "${filter}".`));
+  if (filteredAssigned.length === 0) {
+    p.outro(chalk.yellow(filter ? `No tickets match "${filter}".` : `No open tickets assigned to "${user}".`));
     return;
   }
+
+  // Re-attach the context parents needed for the filtered set.
+  const neededParentIds = new Set(
+    filteredAssigned.map((t) => t.parentId).filter((id): id is string => !!id && contextById.has(id)),
+  );
+  const filtered: Ticket[] = [
+    ...[...neededParentIds].map((id) => contextById.get(id)!),
+    ...filteredAssigned,
+  ];
 
   // ── Detect current branch ticket ──────────────────────────────────────────
 
@@ -79,21 +93,66 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
     }
   } catch { /* not in a git repo */ }
 
-  // ── Ticket picker ─────────────────────────────────────────────────────────
+  // ── Ticket picker (grouped by parent) ────────────────────────────────────
 
-  const ticketId = await p.select({
-    message: `Select a ticket  ${chalk.dim(`(${filtered.length} shown)`)}:`,
-    initialValue: filtered.some((t) => t.id === branchTicketId) ? branchTicketId : undefined,
-    options: filtered.map((t) => ({
+  const byId = new Map(filtered.map((t) => [t.id, t]));
+
+  // Build parent → children map
+  const childrenByParent = new Map<string, Ticket[]>();
+  const standalone: Ticket[] = [];
+
+  for (const t of filteredAssigned) {
+    if (t.parentId && byId.has(t.parentId)) {
+      const arr = childrenByParent.get(t.parentId) ?? [];
+      arr.push(t);
+      childrenByParent.set(t.parentId, arr);
+    } else {
+      standalone.push(t);
+    }
+  }
+
+  // Remove items from standalone that already appear as group headers above.
+  const groupHeaderIds = new Set(childrenByParent.keys());
+  const dedupedStandalone = standalone.filter((t) => !groupHeaderIds.has(t.id));
+
+  // Build select options: groups first, then standalone items
+  type SelectOption = { value: string; label: string; hint: string };
+  const selectOptions: SelectOption[] = [];
+
+  for (const [parentId, children] of childrenByParent) {
+    const parent = byId.get(parentId)!;
+    selectOptions.push({
+      value: parent.id,
+      label: `${chalk.bold.yellow('▸')} ${chalk.dim(parent.id.padEnd(8))} ${truncate(parent.title, 52)}`,
+      hint:  `${parent.type ?? 'User Story'} · ${parent.boardColumn ?? parent.status}`,
+    });
+    children.forEach((child, i) => {
+      const connector = i === children.length - 1 ? '└' : '├';
+      selectOptions.push({
+        value: child.id,
+        label: `  ${chalk.dim(connector)} ${chalk.cyan(child.id.padEnd(8))} ${truncate(child.title, 50)}`,
+        hint:  `${child.boardColumn ?? child.status}${child.type ? ` · ${child.type}` : ''}`,
+      });
+    });
+  }
+
+  for (const t of dedupedStandalone) {
+    selectOptions.push({
       value: t.id,
       label: `${chalk.cyan(t.id.padEnd(10))} ${truncate(t.title, 58)}`,
       hint:  `${t.boardColumn ?? t.status}${t.boardColumn && t.boardColumn !== t.status ? ` (${t.status})` : ''}${t.type ? ` · ${t.type}` : ''}`,
-    })),
+    });
+  }
+
+  const ticketId = await p.select({
+    message: `Select a ticket  ${chalk.dim(`(${filteredAssigned.length} shown)`)}:`,
+    initialValue: filteredAssigned.some((t) => t.id === branchTicketId) ? branchTicketId : undefined,
+    options: selectOptions,
   });
 
   if (p.isCancel(ticketId)) { p.outro('Cancelled.'); return; }
 
-  const ticket = filtered.find((t) => t.id === ticketId)!;
+  const ticket = byId.get(ticketId as string)!;
 
   p.note(
     [

@@ -8,6 +8,10 @@ export interface Ticket {
   url?: string;
   assignee?: string;
   description?: string;
+  /** ID of the parent work item (e.g. User Story this Task belongs to). */
+  parentId?: string;
+  /** True for work items fetched only to provide grouping context (not directly assigned to the user). */
+  isContext?: boolean;
 }
 
 export interface PullRequest {
