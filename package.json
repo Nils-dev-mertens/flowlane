@@ -1,6 +1,6 @@
 {
   "name": "flowlane",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Agile board to pull request workflow automation — Ticket → Branch → PR",
   "main": "dist/index.js",
   "bin": {
