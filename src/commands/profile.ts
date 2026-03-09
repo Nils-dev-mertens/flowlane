@@ -352,15 +352,26 @@ export async function profileAddCommand(nameArg?: string): Promise<void> {
   if (closedStatesValue)  profileConfig.closedStates  = closedStatesValue;
 
   cfg.saveProfile(profileName, profileConfig);
+  cfg.setActiveProfile(profileName);
 
   p.note(
     Object.entries(profileConfig)
       .map(([k, v]) => `${chalk.dim(k.padEnd(12))} ${k === 'token' ? chalk.dim('***') : v}`)
       .join('\n'),
-    `Profile "${profileName}" saved`,
+    `Profile "${profileName}" saved & activated`,
   );
 
-  p.outro(`${chalk.green('✓')} Run ${chalk.cyan(`flowlane profile use ${profileName}`)} to activate it.`);
+  // Offer to pin this profile to the current repo
+  const pinLocal = await p.confirm({
+    message: `Pin "${profileName}" as the default profile for this repo? (writes .flowlane)`,
+    initialValue: true,
+  });
+  if (!p.isCancel(pinLocal) && pinLocal) {
+    cfg.saveLocalConfig(process.cwd(), { profile: profileName });
+    p.log.success(`${chalk.green('✓')} .flowlane written — this repo will always use "${profileName}".`);
+  }
+
+  p.outro(`${chalk.green('✓')} Profile "${profileName}" is now active.`);
 }
 
 // ── profile init-local ────────────────────────────────────────────────────────
