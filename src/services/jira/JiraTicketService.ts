@@ -30,7 +30,7 @@ export class JiraTicketService implements ITicketService {
     );
   }
 
-  async updateStatus(_id: string, _status: string): Promise<void> {
+  async updateStatus(_id: string, _state: string, _boardColumn?: string): Promise<void> {
     throw new Error(
       'Jira provider is not yet implemented. ' +
       'See src/services/jira/JiraTicketService.ts to contribute.',

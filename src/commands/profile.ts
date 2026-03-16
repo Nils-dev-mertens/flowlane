@@ -4,6 +4,7 @@ import { container } from '../container';
 import { TOKENS } from '../tokens';
 import { ConfigService } from '../config/ConfigService';
 import { detectFromGit } from '../utils/gitDetect';
+import { fetchBoardColumns } from '../utils/azureBoard';
 import type { FlowlaneConfig } from '../types';
 
 // ── profile list ──────────────────────────────────────────────────────────────
@@ -203,6 +204,155 @@ export async function profileAddCommand(nameArg?: string): Promise<void> {
   }) as string;
   if (p.isCancel(baseBranch)) { p.cancel('Cancelled.'); return; }
 
+  // ── Team name (Azure DevOps only) ─────────────────────────────────────────
+
+  let teamValue = '';
+  let activeStatusValue = '';  // System.State for "in progress"
+  let activeColumnValue = '';  // System.BoardColumn for "in progress"
+  let reviewStatusValue = '';  // System.State for "in review"
+  let reviewColumnValue = '';  // System.BoardColumn for "in review"
+  let closedStatesValue = '';
+
+  if (platform === 'azuredevops') {
+    const defaultTeam = `${project.trim()} Team`;
+    const teamInput = await p.text({
+      message: 'Azure DevOps team name (used to read your board columns):',
+      placeholder: defaultTeam,
+      initialValue: '',
+    }) as string;
+    if (p.isCancel(teamInput)) { p.cancel('Cancelled.'); return; }
+    teamValue = teamInput?.trim() || defaultTeam;
+
+    // ── Fetch board columns ──────────────────────────────────────────────────
+
+    const boardSpinner = p.spinner();
+    boardSpinner.start(`Fetching board columns for "${teamValue}"…`);
+
+    let boardColumns: Awaited<ReturnType<typeof fetchBoardColumns>> | null = null;
+    try {
+      boardColumns = await fetchBoardColumns(org.trim(), project.trim(), token.trim(), teamValue);
+      boardSpinner.stop(`Found ${boardColumns.length} board column(s).`);
+    } catch (err: unknown) {
+      boardSpinner.stop(chalk.yellow(`Could not fetch board: ${err instanceof Error ? err.message : String(err)}`));
+      p.log.warn('Falling back to manual input. Update later with `flowlane config set`.');
+    }
+
+    if (boardColumns && boardColumns.length > 0) {
+      // Build a map: column name → unique state values
+      const colStateMap = new Map(boardColumns.map((c) => [c.name, c.states]));
+
+      // ── Pick the "actively working on it" column ──────────────────────────
+
+      const activePick = await p.select({
+        message: 'Which column means you\'re actively working on a ticket?',
+        options: [
+          { value: '', label: 'Skip — don\'t change status when starting work', hint: '' },
+          ...boardColumns.map((col) => ({
+            value: col.name,
+            label: col.name,
+            hint:  col.states.length > 0 ? `state: ${col.states.join(', ')}` : '',
+          })),
+        ],
+      }) as string;
+      if (p.isCancel(activePick)) { p.cancel('Cancelled.'); return; }
+
+      if (activePick) {
+        const activeStates = colStateMap.get(activePick) ?? [];
+        activeColumnValue = activePick;
+        activeStatusValue = activeStates[0] ?? '';
+      }
+
+      // ── Pick the "in review" column ────────────────────────────────────────
+
+      const reviewPick = await p.select({
+        message: 'Which column means "ready for review"?',
+        options: [
+          { value: '', label: 'Skip — don\'t change status when moving to review', hint: '' },
+          ...boardColumns.map((col) => ({
+            value: col.name,
+            label: col.name,
+            hint:  col.states.length > 0 ? `state: ${col.states.join(', ')}` : '',
+          })),
+        ],
+      }) as string;
+      if (p.isCancel(reviewPick)) { p.cancel('Cancelled.'); return; }
+
+      if (reviewPick) {
+        // Store column name (System.BoardColumn) and its underlying state (System.State)
+        const reviewStates = colStateMap.get(reviewPick) ?? [];
+        reviewColumnValue = reviewPick;                // e.g. "Ready for Review"
+        reviewStatusValue = reviewStates[0] ?? '';     // e.g. "Active"
+      }
+
+      // ── Pick the "done / closed" columns ──────────────────────────────────
+
+      const closedPick = await p.multiselect({
+        message: 'Which columns are "done / closed"? (multi-select, Space to toggle)',
+        options: boardColumns.map((col) => ({
+          value: col.name,
+          label: col.name,
+          hint:  col.states.length > 0 ? `state: ${col.states.join(', ')}` : '',
+        })),
+        initialValues: boardColumns.filter((c) => c.isOutgoing).map((c) => c.name),
+        required: false,
+      }) as string[];
+      if (p.isCancel(closedPick)) { p.cancel('Cancelled.'); return; }
+
+      // Flatten all selected column states into a deduplicated comma-separated list
+      const allClosedStates = closedPick
+        .flatMap((colName) => colStateMap.get(colName) ?? [])
+        .filter((v, i, arr) => arr.indexOf(v) === i);
+      closedStatesValue = allClosedStates.join(',');
+
+    } else {
+      // ── Fallback: manual text input ─────────────────────────────────────────
+
+      const activeColumnInput = await p.text({
+        message: 'Board column when you start work (leave blank to skip):',
+        placeholder: 'Doing',
+        initialValue: '',
+      }) as string;
+      if (p.isCancel(activeColumnInput)) { p.cancel('Cancelled.'); return; }
+      activeColumnValue = activeColumnInput?.trim() ?? '';
+
+      const activeStateInput = await p.text({
+        message: activeColumnValue ? 'System.State for that column:' : '',
+        placeholder: 'Active',
+        initialValue: '',
+      }) as string;
+      if (activeColumnValue) {
+        if (p.isCancel(activeStateInput)) { p.cancel('Cancelled.'); return; }
+        activeStatusValue = activeStateInput?.trim() ?? '';
+      }
+
+      const reviewStatusInput = await p.text({
+        message: 'Board column when moving to review (leave blank to skip):',
+        placeholder: 'Ready for Review',
+        initialValue: '',
+      }) as string;
+      if (p.isCancel(reviewStatusInput)) { p.cancel('Cancelled.'); return; }
+      reviewColumnValue = reviewStatusInput?.trim() ?? '';
+
+      const reviewStateInput = await p.text({
+        message: reviewColumnValue ? 'System.State for that column:' : '',
+        placeholder: 'Active',
+        initialValue: '',
+      }) as string;
+      if (reviewColumnValue) {
+        if (p.isCancel(reviewStateInput)) { p.cancel('Cancelled.'); return; }
+        reviewStatusValue = reviewStateInput?.trim() ?? '';
+      }
+
+      const closedStatesInput = await p.text({
+        message: 'Comma-separated closed/done states:',
+        placeholder: 'Done,Removed,Closed,Resolved',
+        initialValue: '',
+      }) as string;
+      if (p.isCancel(closedStatesInput)) { p.cancel('Cancelled.'); return; }
+      closedStatesValue = closedStatesInput?.trim() ?? '';
+    }
+  }
+
   // ── Persist ───────────────────────────────────────────────────────────────
 
   const profileConfig: Partial<FlowlaneConfig> = {
@@ -216,16 +366,34 @@ export async function profileAddCommand(nameArg?: string): Promise<void> {
     baseBranch: (baseBranch || 'main').trim(),
   };
 
+  if (teamValue)          profileConfig.team          = teamValue;
+  if (activeColumnValue)  profileConfig.activeColumn  = activeColumnValue;
+  if (activeStatusValue)  profileConfig.activeStatus  = activeStatusValue;
+  if (reviewColumnValue)  profileConfig.reviewColumn  = reviewColumnValue;
+  if (reviewStatusValue)  profileConfig.reviewStatus  = reviewStatusValue;
+  if (closedStatesValue)  profileConfig.closedStates  = closedStatesValue;
+
   cfg.saveProfile(profileName, profileConfig);
+  cfg.setActiveProfile(profileName);
 
   p.note(
     Object.entries(profileConfig)
       .map(([k, v]) => `${chalk.dim(k.padEnd(12))} ${k === 'token' ? chalk.dim('***') : v}`)
       .join('\n'),
-    `Profile "${profileName}" saved`,
+    `Profile "${profileName}" saved & activated`,
   );
 
-  p.outro(`${chalk.green('✓')} Run ${chalk.cyan(`flowlane profile use ${profileName}`)} to activate it.`);
+  // Offer to pin this profile to the current repo
+  const pinLocal = await p.confirm({
+    message: `Pin "${profileName}" as the default profile for this repo? (writes .flowlane)`,
+    initialValue: true,
+  });
+  if (!p.isCancel(pinLocal) && pinLocal) {
+    cfg.saveLocalConfig(process.cwd(), { profile: profileName });
+    p.log.success(`${chalk.green('✓')} .flowlane written — this repo will always use "${profileName}".`);
+  }
+
+  p.outro(`${chalk.green('✓')} Profile "${profileName}" is now active.`);
 }
 
 // ── profile init-local ────────────────────────────────────────────────────────
