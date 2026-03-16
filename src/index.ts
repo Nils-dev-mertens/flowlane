@@ -108,6 +108,27 @@ program
     }
   });
 
+// ── describe ──────────────────────────────────────────────────────────────────
+
+program
+  .command('describe [ticketId]')
+  .description('Show the full description of a ticket (defaults to current branch ticket)')
+  .action(async (ticketId?: string) => {
+    await ensureConfig();
+    const id = resolveTicketId(ticketId);
+    if (!id) {
+      console.error(chalk.red('No ticket ID provided and could not detect one from the current branch.'));
+      process.exit(1);
+    }
+    const { describeCommand } = await import('./commands/describe');
+    try {
+      await describeCommand(id);
+    } catch (err: unknown) {
+      console.error(chalk.red(`Error: ${errMsg(err)}`));
+      process.exit(1);
+    }
+  });
+
 // ── start ─────────────────────────────────────────────────────────────────────
 
 program

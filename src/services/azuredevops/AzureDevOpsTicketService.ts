@@ -17,6 +17,7 @@ const TICKET_FIELDS = [
   'System.AssignedTo',
   'System.TeamProject',
   'System.Parent',
+  'System.Description',
 ];
 
 const DEFAULT_CLOSED_STATES = ['Done', 'Removed', 'Closed', 'Resolved'];
@@ -198,6 +199,7 @@ export class AzureDevOpsTicketService implements ITicketService {
   private map(wi: WorkItem): Ticket {
     const f = wi.fields ?? {};
     const assignee = f['System.AssignedTo'];
+    const rawDescription = f['System.Description'] as string | undefined;
     return {
       id:          String(wi.id),
       title:       f['System.Title']       ?? '(No title)',
@@ -207,11 +209,31 @@ export class AzureDevOpsTicketService implements ITicketService {
       url:         (wi._links as Record<string, { href: string }> | undefined)?.html?.href,
       assignee:    typeof assignee === 'object' ? assignee?.displayName : assignee,
       parentId:    f['System.Parent'] != null ? String(f['System.Parent']) : undefined,
+      description: rawDescription ? stripHtml(rawDescription) : undefined,
     };
   }
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Strips HTML tags and decodes common entities for terminal display.
+ */
+function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
 
 /**
  * Azure DevOps API errors come back as JSON in the response body, e.g.:
