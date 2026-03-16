@@ -31,17 +31,19 @@ export class AzureDevOpsTicketService implements ITicketService {
   private boardColumnField: string | null | undefined = undefined; // undefined = not yet fetched
 
   constructor(@inject(TOKENS.ConfigService) private readonly config: IConfigService) {
-    const token = config.get<string>('token')!;
-    const org   = config.get<string>('org')!;
-    this.project = config.get<string>('project')!;
+    const authMethod = config.get<string>('authMethod') ?? 'pat';
+    const org        = config.get<string>('org')!;
+    this.project     = config.get<string>('project')!;
 
     const closedRaw = config.get<string>('closedStates');
     this.closedStates = closedRaw
       ? closedRaw.split(',').map((s) => s.trim()).filter(Boolean)
       : DEFAULT_CLOSED_STATES;
 
-    const authHandler = azdev.getPersonalAccessTokenHandler(token);
-    this.connection   = new azdev.WebApi(`https://dev.azure.com/${org}`, authHandler);
+    const authHandler = authMethod === 'az-cli'
+      ? azdev.getBearerHandler(getAzCliToken())
+      : azdev.getPersonalAccessTokenHandler(config.get<string>('token')!);
+    this.connection = new azdev.WebApi(`https://dev.azure.com/${org}`, authHandler);
   }
   
   async getTicket(id: string): Promise<Ticket> {
@@ -64,7 +66,7 @@ export class AzureDevOpsTicketService implements ITicketService {
 
     // Use single-quotes inside WIQL; escape any single-quotes in the user string.
     const safeUser = user.replace(/'/g, "''");
-    const notClosed = this.closedStates.map((s) => `'${s}'`).join(', ');
+    const notClosed = this.closedStates.map((s) => `'${s.replace(/'/g, "''")}'`).join(', ');
 
     const wiql = {
       query: `

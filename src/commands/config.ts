@@ -5,7 +5,17 @@ import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { FlowlaneConfig } from '../types';
 import { ConfigService } from '../config/ConfigService';
 
+const VALID_CONFIG_KEYS = new Set<keyof FlowlaneConfig>([
+  'platform', 'authMethod', 'org', 'project', 'repo', 'token',
+  'user', 'baseBranch', 'baseUrl', 'team', 'activeStatus', 'activeColumn',
+  'reviewStatus', 'reviewColumn', 'closedStates',
+]);
+
 export function configSetCommand(key: string, value: string): void {
+  if (!VALID_CONFIG_KEYS.has(key as keyof FlowlaneConfig)) {
+    console.error(chalk.red(`Unknown config key: "${key}". Valid keys: ${[...VALID_CONFIG_KEYS].join(', ')}`));
+    process.exit(1);
+  }
   const cfg = container.resolve<IConfigService>(TOKENS.ConfigService);
   cfg
     .set(key as keyof FlowlaneConfig, value)

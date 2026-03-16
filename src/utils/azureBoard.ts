@@ -17,8 +17,11 @@ export async function fetchBoardColumns(
   project: string,
   token: string,
   team: string,
+  authMethod: 'pat' | 'az-cli' = 'pat',
 ): Promise<BoardColumnInfo[]> {
-  const authHandler = azdev.getPersonalAccessTokenHandler(token);
+  const authHandler = authMethod === 'az-cli'
+    ? azdev.getBearerHandler(token)
+    : azdev.getPersonalAccessTokenHandler(token);
   const connection  = new azdev.WebApi(`https://dev.azure.com/${org}`, authHandler);
   const workApi     = await connection.getWorkApi();
 

@@ -5,6 +5,7 @@ import { TOKENS } from '../tokens';
 import { ConfigService } from '../config/ConfigService';
 import { detectFromGit } from '../utils/gitDetect';
 import { fetchBoardColumns } from '../utils/azureBoard';
+import { getAzCliToken } from '../utils/azCliAuth';
 import type { FlowlaneConfig } from '../types';
 
 // ── profile list ──────────────────────────────────────────────────────────────
@@ -230,7 +231,8 @@ export async function profileAddCommand(nameArg?: string): Promise<void> {
 
     let boardColumns: Awaited<ReturnType<typeof fetchBoardColumns>> | null = null;
     try {
-      boardColumns = await fetchBoardColumns(org.trim(), project.trim(), token.trim(), teamValue);
+      const tokenForBoard = authMethod === 'az-cli' ? getAzCliToken() : token.trim();
+      boardColumns = await fetchBoardColumns(org.trim(), project.trim(), tokenForBoard, teamValue, authMethod);
       boardSpinner.stop(`Found ${boardColumns.length} board column(s).`);
     } catch (err: unknown) {
       boardSpinner.stop(chalk.yellow(`Could not fetch board: ${err instanceof Error ? err.message : String(err)}`));

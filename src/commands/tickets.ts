@@ -4,6 +4,7 @@ import { execSync } from 'child_process';
 import { container } from '../container';
 import { TOKENS } from '../tokens';
 import { fetchBoardColumns } from '../utils/azureBoard';
+import { getAzCliToken } from '../utils/azCliAuth';
 import { ticketIdFromBranch } from '../utils/branch';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { ITicketService } from '../services/interfaces/ITicketService';
@@ -201,9 +202,10 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
 
   switch (action) {
     case 'column': {
-      const org  = cfg.get<string>('org')!;
-      const proj = cfg.get<string>('project')!;
-      const tok  = cfg.get<string>('token')!;
+      const org        = cfg.get<string>('org')!;
+      const proj       = cfg.get<string>('project')!;
+      const authMethod = (cfg.get<string>('authMethod') ?? 'pat') as 'pat' | 'az-cli';
+      const tok        = authMethod === 'az-cli' ? getAzCliToken() : cfg.get<string>('token')!;
 
       // Resolve team — use stored value or ask once and save it.
       let team = cfg.get<string>('team');
@@ -223,7 +225,7 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
       fetchSpinner.start(`Fetching board columns for "${team}"…`);
       let columns: Awaited<ReturnType<typeof fetchBoardColumns>> = [];
       try {
-        columns = await fetchBoardColumns(org, proj, tok, team);
+        columns = await fetchBoardColumns(org, proj, tok, team, authMethod);
         fetchSpinner.stop(`${columns.length} columns found.`);
       } catch (err: unknown) {
         fetchSpinner.stop(chalk.red(`Could not fetch board: ${errMsg(err)}`));

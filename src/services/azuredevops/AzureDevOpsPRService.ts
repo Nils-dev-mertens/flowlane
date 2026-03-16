@@ -10,24 +10,25 @@ import { getAzCliToken } from '../../utils/azCliAuth';
 
 @injectable()
 export class AzureDevOpsPRService implements IPRService {
-  private readonly connection: azdev.WebApi;
   private readonly project: string;
   private readonly repo: string;
   private readonly org: string;
   private gitApi: IGitApi | null = null;
 
   constructor(@inject(TOKENS.ConfigService) private readonly config: IConfigService) {
-    const authMethod = config.get<string>('authMethod') ?? 'pat';
-    this.org         = config.get<string>('org')!;
-    this.project     = config.get<string>('project')!;
+    this.org     = config.get<string>('org')!;
+    this.project = config.get<string>('project')!;
     // Fall back to project name when no dedicated repo name is configured.
-    this.repo        = config.get<string>('repo') || this.project;
+    this.repo    = config.get<string>('repo') || this.project;
+  }
 
+  /** Create a fresh connection with a current token (az-cli tokens expire after ~1 hour). */
+  private createConnection(): azdev.WebApi {
+    const authMethod  = this.config.get<string>('authMethod') ?? 'pat';
     const authHandler = authMethod === 'az-cli'
       ? azdev.getBearerHandler(getAzCliToken())
-      : azdev.getPersonalAccessTokenHandler(config.get<string>('token')!);
-
-    this.connection = new azdev.WebApi(`https://dev.azure.com/${this.org}`, authHandler);
+      : azdev.getPersonalAccessTokenHandler(this.config.get<string>('token')!);
+    return new azdev.WebApi(`https://dev.azure.com/${this.org}`, authHandler);
   }
 
   async createPR(params: CreatePRParams): Promise<PullRequest> {
@@ -70,7 +71,7 @@ export class AzureDevOpsPRService implements IPRService {
 
   private async api(): Promise<IGitApi> {
     if (!this.gitApi) {
-      this.gitApi = await this.connection.getGitApi();
+      this.gitApi = await this.createConnection().getGitApi();
     }
     return this.gitApi;
   }

@@ -1,1 +1,0 @@
-{ "title": "feat: Display issue descriptions and full details", "body": "Enhance issue viewing capabilities to show full issue descriptions, body content, labels, assignees, and other metadata. Currently only titles are shown - users need to see the complete issue context to understand requirements." }

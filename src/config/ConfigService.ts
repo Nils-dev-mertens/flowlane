@@ -2,6 +2,7 @@ import { injectable } from 'tsyringe';
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { homedir, platform } from 'os';
 import { join, dirname } from 'path';
+import { execFileSync } from 'child_process';
 import type { FlowlaneConfig, LocalRepoConfig, ProfilesFile } from '../types';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 
@@ -170,7 +171,11 @@ export class ConfigService implements IConfigService {
           activeProfile: 'default',
           profiles: { default: legacy },
         };
-        this.persistProfilesFile(migrated);
+        try {
+          this.persistProfilesFile(migrated);
+        } catch {
+          console.warn('Warning: could not persist config migration — run `flowlane init` to re-configure.');
+        }
         this.profilesCache = migrated;
         return migrated;
       }
@@ -200,10 +205,25 @@ export class ConfigService implements IConfigService {
   }
 
   private findLocalConfig(): string | undefined {
+    // Resolve the git repo root to avoid trusting .flowlane files placed in
+    // ancestor directories outside the current repository.
+    let gitRoot: string | undefined;
+    try {
+      gitRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+        encoding: 'utf8',
+        stdio: 'pipe',
+      }).trim();
+    } catch {
+      // Not in a git repo — only check cwd itself.
+      gitRoot = process.cwd();
+    }
+
     let dir = process.cwd();
     for (;;) {
       const candidate = join(dir, LOCAL_FILENAME);
       if (existsSync(candidate)) return candidate;
+      // Stop at the git root — don't walk above the repo boundary.
+      if (dir === gitRoot) return undefined;
       const parent = dirname(dir);
       if (parent === dir) return undefined; // reached filesystem root
       dir = parent;
