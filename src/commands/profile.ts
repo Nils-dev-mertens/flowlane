@@ -150,18 +150,39 @@ export async function profileAddCommand(nameArg?: string): Promise<void> {
   if (p.isCancel(repoInput)) { p.cancel('Cancelled.'); return; }
   const repo = repoInput?.trim() || project.trim();
 
-  // ── Token ─────────────────────────────────────────────────────────────────
+  // ── Auth method ───────────────────────────────────────────────────────────
 
-  const tokenHint = platform === 'azuredevops'
-    ? 'dev.azure.com → User Settings → Personal Access Tokens\nScopes: Work Items R+W, Code R+W, Pull Requests R+W'
-    : 'id.atlassian.com → Manage profile → Security → API tokens';
-  p.note(tokenHint, 'How to get a token');
+  let authMethod: 'pat' | 'az-cli' = 'pat';
+  let token = '';
 
-  const token = await p.password({
-    message: 'API token / PAT:',
-    validate: (v) => v.trim() ? undefined : 'Required',
-  }) as string;
-  if (p.isCancel(token)) { p.cancel('Cancelled.'); return; }
+  if (platform === 'azuredevops') {
+    const authChoice = await p.select({
+      message: 'Authentication method:',
+      initialValue: 'pat',
+      options: [
+        { value: 'pat',    label: 'Personal Access Token (PAT)', hint: 'token stored in config' },
+        { value: 'az-cli', label: 'Azure CLI (az login)',        hint: 'no token stored — uses az account get-access-token' },
+      ],
+    }) as string;
+    if (p.isCancel(authChoice)) { p.cancel('Cancelled.'); return; }
+    authMethod = authChoice as 'pat' | 'az-cli';
+  }
+
+  if (authMethod === 'pat') {
+    const tokenHint = platform === 'azuredevops'
+      ? 'dev.azure.com → User Settings → Personal Access Tokens\nScopes: Work Items R+W, Code R+W, Pull Requests R+W'
+      : 'id.atlassian.com → Manage profile → Security → API tokens';
+    p.note(tokenHint, 'How to get a token');
+
+    const pat = await p.password({
+      message: 'API token / PAT:',
+      validate: (v) => v.trim() ? undefined : 'Required',
+    }) as string;
+    if (p.isCancel(pat)) { p.cancel('Cancelled.'); return; }
+    token = pat.trim();
+  } else {
+    p.note('Make sure you are signed in: az login', 'Azure CLI auth');
+  }
 
   // ── User ──────────────────────────────────────────────────────────────────
 
@@ -186,10 +207,11 @@ export async function profileAddCommand(nameArg?: string): Promise<void> {
 
   const profileConfig: Partial<FlowlaneConfig> = {
     platform:   platform as FlowlaneConfig['platform'],
+    authMethod: authMethod === 'az-cli' ? 'az-cli' : undefined,
     org:        org.trim(),
     project:    project.trim(),
     repo:       repo,
-    token:      token.trim(),
+    ...(token ? { token } : {}),
     user:       user.trim(),
     baseBranch: (baseBranch || 'main').trim(),
   };

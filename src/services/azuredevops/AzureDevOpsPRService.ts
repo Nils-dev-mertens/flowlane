@@ -6,6 +6,7 @@ import type { IPRService } from '../interfaces/IPRService';
 import type { IConfigService } from '../interfaces/IConfigService';
 import type { PullRequest, CreatePRParams } from '../../types';
 import { TOKENS } from '../../tokens';
+import { getAzCliToken } from '../../utils/azCliAuth';
 
 @injectable()
 export class AzureDevOpsPRService implements IPRService {
@@ -16,14 +17,17 @@ export class AzureDevOpsPRService implements IPRService {
   private gitApi: IGitApi | null = null;
 
   constructor(@inject(TOKENS.ConfigService) private readonly config: IConfigService) {
-    const token  = config.get<string>('token')!;
-    this.org     = config.get<string>('org')!;
-    this.project = config.get<string>('project')!;
+    const authMethod = config.get<string>('authMethod') ?? 'pat';
+    this.org         = config.get<string>('org')!;
+    this.project     = config.get<string>('project')!;
     // Fall back to project name when no dedicated repo name is configured.
-    this.repo    = config.get<string>('repo') || this.project;
+    this.repo        = config.get<string>('repo') || this.project;
 
-    const authHandler = azdev.getPersonalAccessTokenHandler(token);
-    this.connection   = new azdev.WebApi(`https://dev.azure.com/${this.org}`, authHandler);
+    const authHandler = authMethod === 'az-cli'
+      ? azdev.getBearerHandler(getAzCliToken())
+      : azdev.getPersonalAccessTokenHandler(config.get<string>('token')!);
+
+    this.connection = new azdev.WebApi(`https://dev.azure.com/${this.org}`, authHandler);
   }
 
   async createPR(params: CreatePRParams): Promise<PullRequest> {

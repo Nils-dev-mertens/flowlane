@@ -6,6 +6,7 @@ import type { ITicketService } from '../interfaces/ITicketService';
 import type { IConfigService } from '../interfaces/IConfigService';
 import type { Ticket } from '../../types';
 import { TOKENS } from '../../tokens';
+import { getAzCliToken } from '../../utils/azCliAuth';
 
 const TICKET_FIELDS = [
   'System.Id',
@@ -25,12 +26,15 @@ export class AzureDevOpsTicketService implements ITicketService {
   private witApi: IWorkItemTrackingApi | null = null;
 
   constructor(@inject(TOKENS.ConfigService) private readonly config: IConfigService) {
-    const token = config.get<string>('token')!;
-    const org   = config.get<string>('org')!;
-    this.project = config.get<string>('project')!;
+    const org        = config.get<string>('org')!;
+    const authMethod = config.get<string>('authMethod') ?? 'pat';
+    this.project     = config.get<string>('project')!;
 
-    const authHandler = azdev.getPersonalAccessTokenHandler(token);
-    this.connection   = new azdev.WebApi(`https://dev.azure.com/${org}`, authHandler);
+    const authHandler = authMethod === 'az-cli'
+      ? azdev.getBearerHandler(getAzCliToken())
+      : azdev.getPersonalAccessTokenHandler(config.get<string>('token')!);
+
+    this.connection = new azdev.WebApi(`https://dev.azure.com/${org}`, authHandler);
   }
 
   async getTicket(id: string): Promise<Ticket> {

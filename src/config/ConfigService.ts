@@ -1,17 +1,22 @@
 import { injectable } from 'tsyringe';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { homedir } from 'os';
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { homedir, platform } from 'os';
 import { join, dirname } from 'path';
 import type { FlowlaneConfig, LocalRepoConfig, ProfilesFile } from '../types';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 
-const REQUIRED_FIELDS: ReadonlyArray<keyof FlowlaneConfig> = [
+const ALWAYS_REQUIRED: ReadonlyArray<keyof FlowlaneConfig> = [
   'platform',
   'org',
   'project',
-  'token',
   'user',
 ];
+
+/** token is only required when not using az-cli auth */
+function requiredFields(config: Partial<FlowlaneConfig>): ReadonlyArray<keyof FlowlaneConfig> {
+  if (config.authMethod === 'az-cli') return ALWAYS_REQUIRED;
+  return [...ALWAYS_REQUIRED, 'token'];
+}
 
 const LOCAL_FILENAME = '.flowlane';
 
@@ -57,9 +62,10 @@ export class ConfigService implements IConfigService {
   }
 
   validate(): { valid: boolean; missing: string[] } {
-    if (!this.exists()) return { valid: false, missing: [...REQUIRED_FIELDS] };
+    if (!this.exists()) return { valid: false, missing: [...ALWAYS_REQUIRED, 'token'] };
     const config = this.resolved();
-    const missing = REQUIRED_FIELDS.filter((f) => !config[f]);
+    const fields = requiredFields(config);
+    const missing = fields.filter((f) => !config[f]);
     return { valid: missing.length === 0, missing };
   }
 
@@ -208,5 +214,9 @@ export class ConfigService implements IConfigService {
     const dir = dirname(this.configFilePath);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     writeFileSync(this.configFilePath, JSON.stringify(pf, null, 2) + '\n', 'utf8');
+    // Restrict config file to owner-only on Unix to protect stored tokens.
+    if (platform() !== 'win32') {
+      chmodSync(this.configFilePath, 0o600);
+    }
   }
 }

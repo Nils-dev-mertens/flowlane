@@ -22,10 +22,13 @@ export interface BranchInfo {
 
 export interface FlowlaneConfig {
   platform: 'azuredevops' | 'jira';
+  /** How to authenticate. Defaults to 'pat' if omitted. */
+  authMethod?: 'pat' | 'az-cli';
   org: string;
   project: string;
   repo?: string;
-  token: string;
+  /** Required when authMethod is 'pat' (or unset). Not used with 'az-cli'. */
+  token?: string;
   user: string;
   baseBranch?: string;
   baseUrl?: string;
