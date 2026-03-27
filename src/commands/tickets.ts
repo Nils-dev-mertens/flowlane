@@ -184,19 +184,21 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
   const action = await p.select({
     message: 'What would you like to do?',
     options: [
-      { value: 'column',  label: 'Change column / status',  hint: 'move ticket to any column on the board' },
-      { value: 'start',   label: chalk.bold('Full workflow'), hint: startHint },
-      { value: 'branch',  label: 'Create & push branch' },
-      { value: 'pr',      label: 'Create pull request' },
+      { value: 'column',     label: 'Change column / status',  hint: 'move ticket to any column on the board' },
+      { value: 'start',      label: chalk.bold('Full workflow'), hint: startHint },
+      { value: 'branch',     label: 'Create & push branch' },
+      { value: 'pr',         label: 'Create pull request' },
+      { value: 'pr-comment', label: 'Add comment to PR',       hint: 'post a comment on the open PR for the current branch' },
     ],
   });
 
   if (p.isCancel(action)) { p.outro('Cancelled.'); return; }
 
   // Import commands lazily to avoid circular-dependency issues at top-level.
-  const { branchCommand } = await import('./branch');
-  const { prCommand }     = await import('./pr');
-  const { startCommand }  = await import('./start');
+  const { branchCommand }    = await import('./branch');
+  const { prCommand }        = await import('./pr');
+  const { startCommand }     = await import('./start');
+  const { prCommentCommand } = await import('./prComment');
 
   console.log('');
 
@@ -272,6 +274,19 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
     case 'pr':
       await prCommand(ticketId as string, { interactive: true });
       break;
+    case 'pr-comment': {
+      const text = await p.text({
+        message: 'Comment text:',
+        validate: (v) => v.trim() ? undefined : 'Required',
+      }) as string;
+      if (p.isCancel(text)) { p.outro('Cancelled.'); break; }
+      try {
+        await prCommentCommand(text.trim());
+      } catch (err: unknown) {
+        p.outro(chalk.red(`Error: ${errMsg(err)}`));
+      }
+      break;
+    }
   }
 }
 

@@ -28,4 +28,12 @@ export class JiraPRService implements IPRService {
       'See src/services/jira/JiraPRService.ts to contribute.',
     );
   }
+
+  async findPRForBranch(_branch: string): Promise<null> {
+    throw new Error('Jira does not host pull requests.');
+  }
+
+  async addComment(_prId: string | number, _comment: string): Promise<void> {
+    throw new Error('Jira does not host pull requests.');
+  }
 }

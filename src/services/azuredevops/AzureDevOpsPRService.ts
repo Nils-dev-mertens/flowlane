@@ -1,7 +1,7 @@
 import { injectable, inject } from 'tsyringe';
 import * as azdev from 'azure-devops-node-api';
 import type { IGitApi } from 'azure-devops-node-api/GitApi';
-import type { GitPullRequest } from 'azure-devops-node-api/interfaces/GitInterfaces';
+import type { GitPullRequest, CommentThreadStatus } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import type { IPRService } from '../interfaces/IPRService';
 import type { IConfigService } from '../interfaces/IConfigService';
 import type { PullRequest, CreatePRParams } from '../../types';
@@ -55,6 +55,36 @@ export class AzureDevOpsPRService implements IPRService {
       url:    this.prUrl(pr.pullRequestId),
       status: String(pr.status ?? 'active'),
     };
+  }
+
+  async findPRForBranch(branch: string): Promise<PullRequest | null> {
+    const api = await this.api();
+    const prs = await api.getPullRequests(
+      this.repo,
+      { sourceRefName: `refs/heads/${branch}` },
+      this.project,
+    );
+    const pr = prs[0];
+    if (!pr?.pullRequestId) return null;
+    return {
+      id:     pr.pullRequestId,
+      title:  pr.title ?? '',
+      url:    this.prUrl(pr.pullRequestId),
+      status: String(pr.status ?? 'active'),
+    };
+  }
+
+  async addComment(prId: string | number, comment: string): Promise<void> {
+    const api = await this.api();
+    await api.createThread(
+      {
+        comments: [{ content: comment, commentType: 1 }],
+        status: 1 as CommentThreadStatus,
+      },
+      this.repo,
+      Number(prId),
+      this.project,
+    );
   }
 
   async linkWorkItem(prId: string | number, ticketId: string): Promise<void> {

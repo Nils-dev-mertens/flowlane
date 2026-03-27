@@ -51,4 +51,12 @@ export class GitHubVcsService implements IPRService {
       'See src/services/github/GitHubVcsService.ts to contribute.',
     );
   }
+
+  async findPRForBranch(_branch: string): Promise<null> {
+    throw new Error('GitHub VCS service is not yet implemented.');
+  }
+
+  async addComment(_prId: string | number, _comment: string): Promise<void> {
+    throw new Error('GitHub VCS service is not yet implemented.');
+  }
 }

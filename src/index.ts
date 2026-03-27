@@ -66,9 +66,12 @@ program
 
 // ── pr ────────────────────────────────────────────────────────────────────────
 
-program
-  .command('pr [ticketId]')
-  .description('Create a pull request and link the work item (defaults to current branch ticket)')
+const prCmd = program
+  .command('pr')
+  .description('Create a pull request and link the work item (defaults to current branch ticket)');
+
+prCmd
+  .argument('[ticketId]', 'Ticket ID to link (defaults to current branch ticket)')
   .action(async (ticketId?: string) => {
     await ensureConfig();
     const id = resolveTicketId(ticketId);
@@ -80,6 +83,20 @@ program
     const { prCommand } = await import('./commands/pr');
     try {
       await prCommand(id);
+    } catch (err: unknown) {
+      console.error(chalk.red(`Error: ${errMsg(err)}`));
+      process.exit(1);
+    }
+  });
+
+prCmd
+  .command('comment <text>')
+  .description('Add a comment to the open PR for the current branch')
+  .action(async (text: string) => {
+    await ensureConfig();
+    const { prCommentCommand } = await import('./commands/prComment');
+    try {
+      await prCommentCommand(text);
     } catch (err: unknown) {
       console.error(chalk.red(`Error: ${errMsg(err)}`));
       process.exit(1);
