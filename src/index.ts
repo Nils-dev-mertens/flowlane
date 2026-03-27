@@ -23,7 +23,8 @@ const program = new Command();
 program
   .name('flowlane')
   .description('Agile board to PR workflow automation — Ticket → Branch → PR')
-  .version('0.1.0');
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  .version((require('../package.json') as { version: string }).version);
 
 // ── init ──────────────────────────────────────────────────────────────────────
 
