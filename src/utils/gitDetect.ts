@@ -15,6 +15,21 @@ function gitTry(cmd: string): string | undefined {
   }
 }
 
+/** Parse a GitHub remote URL into { org, repo }. */
+function parseGitHubUrl(
+  url: string,
+): { org: string; repo: string } | undefined {
+  // HTTPS: https://github.com/{owner}/{repo}(.git)
+  const https = url.match(/github\.com\/([^/]+)\/([^/\s.]+?)(?:\.git)?$/);
+  if (https) return { org: https[1], repo: https[2] };
+
+  // SSH: git@github.com:{owner}/{repo}(.git)
+  const ssh = url.match(/git@github\.com:([^/]+)\/([^/\s.]+?)(?:\.git)?$/);
+  if (ssh) return { org: ssh[1], repo: ssh[2] };
+
+  return undefined;
+}
+
 /** Parse an Azure DevOps remote URL into { org, project, repo }. */
 function parseAzureDevOpsUrl(
   url: string,
@@ -57,8 +72,15 @@ export function detectFromGit(): GitDetectedConfig {
       result.detected = true;
     }
 
-    // Jira is a PM tool, not git hosting — skip platform detection for
-    // GitHub/GitLab/Bitbucket remotes (user must choose platform manually).
+    // GitHub
+    const gh = parseGitHubUrl(remoteUrl);
+    if (gh) {
+      result.platform = 'github';
+      result.org      = gh.org;
+      result.repo     = gh.repo;
+      result.project  = gh.repo; // project = repo for GitHub
+      result.detected = true;
+    }
   }
 
   // ── Default branch ──────────────────────────────────────────────────────────

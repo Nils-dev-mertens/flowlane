@@ -27,7 +27,7 @@ export interface BranchInfo {
 }
 
 export interface FlowlaneConfig {
-  platform: 'azuredevops' | 'jira';
+  platform: 'azuredevops' | 'jira' | 'github';
   /** How to authenticate. Defaults to 'pat' if omitted. */
   authMethod?: 'pat' | 'az-cli';
   org: string;

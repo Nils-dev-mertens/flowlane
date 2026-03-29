@@ -15,6 +15,8 @@ import { AzureDevOpsTicketService }     from './services/azuredevops/AzureDevOps
 import { AzureDevOpsPRService }         from './services/azuredevops/AzureDevOpsPRService';
 import { JiraTicketService }            from './services/jira/JiraTicketService';
 import { JiraPRService }                from './services/jira/JiraPRService';
+import { GitHubTicketService }          from './services/github/GitHubTicketService';
+import { GitHubVcsService }             from './services/github/GitHubVcsService';
 import { TOKENS }                       from './tokens';
 
 import type { IConfigService } from './services/interfaces/IConfigService';
@@ -44,6 +46,8 @@ export function setupContainer(): void {
             return new AzureDevOpsTicketService(cfg);
           case 'jira':
             return new JiraTicketService(cfg);
+          case 'github':
+            return new GitHubTicketService(cfg);
           default:
             throw new Error(
               `Unknown platform "${platform ?? '(not set)'}". ` +
@@ -67,6 +71,8 @@ export function setupContainer(): void {
             return new AzureDevOpsPRService(cfg);
           case 'jira':
             return new JiraPRService(cfg);
+          case 'github':
+            return new GitHubVcsService(cfg);
           default:
             throw new Error(
               `Unknown platform "${platform ?? '(not set)'}". ` +

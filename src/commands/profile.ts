@@ -117,40 +117,60 @@ export async function profileAddCommand(nameArg?: string): Promise<void> {
     initialValue: detected.platform ?? 'azuredevops',
     options: [
       { value: 'azuredevops', label: 'Azure DevOps', hint: 'dev.azure.com' },
-      { value: 'jira',        label: 'Jira (stub)',  hint: 'atlassian.net' },
+      { value: 'github',      label: 'GitHub',        hint: 'github.com' },
+      { value: 'jira',        label: 'Jira (stub)',   hint: 'atlassian.net' },
     ],
   }) as string;
   if (p.isCancel(platform)) { p.cancel('Cancelled.'); return; }
 
-  // ── Org ───────────────────────────────────────────────────────────────────
+  // ── Org / Owner ───────────────────────────────────────────────────────────
+
+  const orgLabel =
+    platform === 'azuredevops' ? 'Azure DevOps organization:' :
+    platform === 'github'      ? 'GitHub owner (user or org):' :
+                                 'Jira subdomain:';
 
   const org = await p.text({
-    message: platform === 'azuredevops' ? 'Azure DevOps organization:' : 'Jira subdomain:',
-    placeholder: 'my-company',
+    message: orgLabel,
+    placeholder: platform === 'github' ? 'my-username' : 'my-company',
     initialValue: detected.org ?? '',
     validate: (v) => v.trim() ? undefined : 'Required',
   }) as string;
   if (p.isCancel(org)) { p.cancel('Cancelled.'); return; }
 
-  // ── Project ───────────────────────────────────────────────────────────────
+  // ── Project / Repo ────────────────────────────────────────────────────────
 
-  const project = await p.text({
-    message: 'Default project name:',
-    placeholder: 'MyProject',
-    initialValue: detected.project ?? '',
-    validate: (v) => v.trim() ? undefined : 'Required',
-  }) as string;
-  if (p.isCancel(project)) { p.cancel('Cancelled.'); return; }
+  let project: string;
+  let repo: string;
 
-  // ── Repo ──────────────────────────────────────────────────────────────────
+  if (platform === 'github') {
+    const repoInput = await p.text({
+      message: 'Repository name:',
+      placeholder: 'my-repo',
+      initialValue: detected.repo ?? '',
+      validate: (v) => v.trim() ? undefined : 'Required',
+    }) as string;
+    if (p.isCancel(repoInput)) { p.cancel('Cancelled.'); return; }
+    repo    = repoInput.trim();
+    project = repo; // project == repo for GitHub
+  } else {
+    const projectInput = await p.text({
+      message: 'Default project name:',
+      placeholder: 'MyProject',
+      initialValue: detected.project ?? '',
+      validate: (v) => v.trim() ? undefined : 'Required',
+    }) as string;
+    if (p.isCancel(projectInput)) { p.cancel('Cancelled.'); return; }
+    project = projectInput.trim();
 
-  const repoInput = await p.text({
-    message: 'Default repository name (leave blank to use project name):',
-    placeholder: project.trim(),
-    initialValue: detected.repo ?? '',
-  }) as string;
-  if (p.isCancel(repoInput)) { p.cancel('Cancelled.'); return; }
-  const repo = repoInput?.trim() || project.trim();
+    const repoInput = await p.text({
+      message: 'Default repository name (leave blank to use project name):',
+      placeholder: project,
+      initialValue: detected.repo ?? '',
+    }) as string;
+    if (p.isCancel(repoInput)) { p.cancel('Cancelled.'); return; }
+    repo = repoInput?.trim() || project;
+  }
 
   // ── Auth method ───────────────────────────────────────────────────────────
 
@@ -171,9 +191,12 @@ export async function profileAddCommand(nameArg?: string): Promise<void> {
   }
 
   if (authMethod === 'pat') {
-    const tokenHint = platform === 'azuredevops'
-      ? 'dev.azure.com → User Settings → Personal Access Tokens\nScopes: Work Items R+W, Code R+W, Pull Requests R+W'
-      : 'id.atlassian.com → Manage profile → Security → API tokens';
+    const tokenHint =
+      platform === 'azuredevops'
+        ? 'dev.azure.com → User Settings → Personal Access Tokens\nScopes: Work Items R+W, Code R+W, Pull Requests R+W'
+        : platform === 'github'
+        ? 'github.com → Settings → Developer settings → Personal access tokens\nScopes: repo (full control)'
+        : 'id.atlassian.com → Manage profile → Security → API tokens';
     p.note(tokenHint, 'How to get a token');
 
     const pat = await p.password({
@@ -188,9 +211,14 @@ export async function profileAddCommand(nameArg?: string): Promise<void> {
 
   // ── User ──────────────────────────────────────────────────────────────────
 
+  const userPlaceholder =
+    platform === 'azuredevops' ? 'jane@company.com' :
+    platform === 'github'      ? 'jane' :
+                                 'jane@atlassian.net';
+
   const user = await p.text({
     message: 'Your username / email (used to fetch assigned tickets):',
-    placeholder: platform === 'azuredevops' ? 'jane@company.com' : 'jane@atlassian.net',
+    placeholder: userPlaceholder,
     initialValue: detected.user ?? '',
     validate: (v) => v.trim() ? undefined : 'Required',
   }) as string;
