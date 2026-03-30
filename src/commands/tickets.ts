@@ -280,8 +280,45 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
         validate: (v) => v.trim() ? undefined : 'Required',
       }) as string;
       if (p.isCancel(text)) { p.outro('Cancelled.'); break; }
+
+      const fileInput = await p.text({
+        message: 'File path for inline comment (leave empty to skip):',
+        placeholder: 'src/foo.ts',
+      });
+      if (p.isCancel(fileInput)) { p.outro('Cancelled.'); break; }
+
+      let file: string | undefined;
+      let line: number | undefined;
+      let endLine: number | undefined;
+
+      if (typeof fileInput === 'string' && fileInput.trim()) {
+        file = fileInput.trim();
+
+        const lineInput = await p.text({
+          message: 'Line number (leave empty to skip):',
+          placeholder: '42',
+          validate: (v) => (!v || /^\d+$/.test(v.trim())) ? undefined : 'Must be a number',
+        });
+        if (p.isCancel(lineInput)) { p.outro('Cancelled.'); break; }
+
+        if (typeof lineInput === 'string' && lineInput.trim()) {
+          line = parseInt(lineInput.trim(), 10);
+
+          const endLineInput = await p.text({
+            message: 'End line for multi-line comment (leave empty for single line):',
+            placeholder: String(line),
+            validate: (v) => (!v || /^\d+$/.test(v.trim())) ? undefined : 'Must be a number',
+          });
+          if (p.isCancel(endLineInput)) { p.outro('Cancelled.'); break; }
+
+          if (typeof endLineInput === 'string' && endLineInput.trim()) {
+            endLine = parseInt(endLineInput.trim(), 10);
+          }
+        }
+      }
+
       try {
-        await prCommentCommand(text.trim());
+        await prCommentCommand(text.trim(), { file, line, endLine });
       } catch (err: unknown) {
         p.outro(chalk.red(`Error: ${errMsg(err)}`));
       }

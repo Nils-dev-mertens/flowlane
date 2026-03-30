@@ -1,5 +1,5 @@
 import { injectable, inject } from 'tsyringe';
-import type { IPRService } from '../interfaces/IPRService';
+import type { IPRService, CommentOptions } from '../interfaces/IPRService';
 import type { IConfigService } from '../interfaces/IConfigService';
 import type { PullRequest, CreatePRParams } from '../../types';
 import { TOKENS } from '../../tokens';
@@ -33,7 +33,7 @@ export class JiraPRService implements IPRService {
     throw new Error('Jira does not host pull requests.');
   }
 
-  async addComment(_prId: string | number, _comment: string): Promise<void> {
+  async addComment(_prId: string | number, _comment: string, _options?: CommentOptions): Promise<void> {
     throw new Error('Jira does not host pull requests.');
   }
 }

@@ -1,5 +1,5 @@
 import { injectable, inject } from 'tsyringe';
-import type { IPRService }     from '../interfaces/IPRService';
+import type { IPRService, CommentOptions } from '../interfaces/IPRService';
 import type { IConfigService } from '../interfaces/IConfigService';
 import type { PullRequest, CreatePRParams } from '../../types';
 import { TOKENS } from '../../tokens';
@@ -48,10 +48,34 @@ export class GitHubVcsService implements IPRService {
     return { id: pr.number, title: pr.title, url: pr.html_url, status: pr.state };
   }
 
-  async addComment(prId: string | number, comment: string): Promise<void> {
-    await this.request('POST', `/repos/${this.owner}/${this.repo}/issues/${prId}/comments`, {
-      body: comment,
-    });
+  async addComment(prId: string | number, comment: string, options?: CommentOptions): Promise<void> {
+    if (options?.filePath) {
+      // Inline review comment — requires the PR's head commit SHA.
+      const pr = await this.request<{ head: { sha: string } }>(
+        'GET',
+        `/repos/${this.owner}/${this.repo}/pulls/${prId}`,
+      );
+      const payload: Record<string, unknown> = {
+        body:      comment,
+        commit_id: pr.head.sha,
+        path:      options.filePath,
+        side:      'RIGHT',
+      };
+      if (options.startLine !== undefined) {
+        if (options.endLine !== undefined && options.endLine !== options.startLine) {
+          payload.start_line = options.startLine;
+          payload.start_side = 'RIGHT';
+          payload.line       = options.endLine;
+        } else {
+          payload.line = options.startLine;
+        }
+      }
+      await this.request('POST', `/repos/${this.owner}/${this.repo}/pulls/${prId}/comments`, payload);
+    } else {
+      await this.request('POST', `/repos/${this.owner}/${this.repo}/issues/${prId}/comments`, {
+        body: comment,
+      });
+    }
   }
 
   async linkWorkItem(prId: string | number, ticketId: string): Promise<void> {

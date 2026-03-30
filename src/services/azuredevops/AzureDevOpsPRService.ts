@@ -2,7 +2,7 @@ import { injectable, inject } from 'tsyringe';
 import * as azdev from 'azure-devops-node-api';
 import type { IGitApi } from 'azure-devops-node-api/GitApi';
 import type { GitPullRequest, CommentThreadStatus } from 'azure-devops-node-api/interfaces/GitInterfaces';
-import type { IPRService } from '../interfaces/IPRService';
+import type { IPRService, CommentOptions } from '../interfaces/IPRService';
 import type { IConfigService } from '../interfaces/IConfigService';
 import type { PullRequest, CreatePRParams } from '../../types';
 import { TOKENS } from '../../tokens';
@@ -74,17 +74,27 @@ export class AzureDevOpsPRService implements IPRService {
     };
   }
 
-  async addComment(prId: string | number, comment: string): Promise<void> {
+  async addComment(prId: string | number, comment: string, options?: CommentOptions): Promise<void> {
     const api = await this.api();
-    await api.createThread(
-      {
-        comments: [{ content: comment, commentType: 1 }],
-        status: 1 as CommentThreadStatus,
-      },
-      this.repo,
-      Number(prId),
-      this.project,
-    );
+
+    const thread: Parameters<IGitApi['createThread']>[0] = {
+      comments: [{ content: comment, commentType: 1 }],
+      status: 1 as CommentThreadStatus,
+    };
+
+    if (options?.filePath) {
+      const line    = options.startLine ?? 1;
+      const endLine = options.endLine ?? line;
+      // Azure DevOps expects the path to start with '/'.
+      const filePath = options.filePath.startsWith('/') ? options.filePath : `/${options.filePath}`;
+      thread.threadContext = {
+        filePath,
+        rightFileStart: { line, offset: 1 },
+        rightFileEnd:   { line: endLine, offset: 1 },
+      };
+    }
+
+    await api.createThread(thread, this.repo, Number(prId), this.project);
   }
 
   async linkWorkItem(prId: string | number, ticketId: string): Promise<void> {

@@ -5,7 +5,13 @@ import { container } from '../container';
 import { TOKENS } from '../tokens';
 import type { IPRService } from '../services/interfaces/IPRService';
 
-export async function prCommentCommand(comment: string): Promise<void> {
+export interface PrCommentOptions {
+  file?: string;
+  line?: number;
+  endLine?: number;
+}
+
+export async function prCommentCommand(comment: string, options: PrCommentOptions = {}): Promise<void> {
   // Resolve current branch.
   let branch: string;
   try {
@@ -27,7 +33,14 @@ export async function prCommentCommand(comment: string): Promise<void> {
 
   spinner.stop(`Found PR: ${chalk.cyan(pr.title)}`);
 
-  await prSvc.addComment(pr.id, comment);
+  const commentOptions = options.file
+    ? { filePath: options.file, startLine: options.line, endLine: options.endLine }
+    : undefined;
 
-  p.outro(`${chalk.green('✓')} Comment added to PR #${pr.id}`);
+  await prSvc.addComment(pr.id, comment, commentOptions);
+
+  const location = options.file
+    ? ` on ${chalk.dim(options.file)}${options.line ? chalk.dim(`:${options.line}`) : ''}`
+    : '';
+  p.outro(`${chalk.green('✓')} Comment added to PR #${pr.id}${location}`);
 }
