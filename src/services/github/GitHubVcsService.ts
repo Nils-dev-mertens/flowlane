@@ -1,7 +1,14 @@
 import { injectable, inject } from 'tsyringe';
 import type { IPRService, CommentOptions } from '../interfaces/IPRService';
 import type { IConfigService } from '../interfaces/IConfigService';
-import type { PullRequest, CreatePRParams } from '../../types';
+import type {
+  PullRequest,
+  PRSummary,
+  PRThread,
+  PRVote,
+  MergeStrategy,
+  CreatePRParams,
+} from '../../types';
 import { TOKENS } from '../../tokens';
 
 @injectable()
@@ -93,6 +100,32 @@ export class GitHubVcsService implements IPRService {
     await this.request('PATCH', `/repos/${this.owner}/${this.repo}/pulls/${prId}`, {
       body: existing + ref,
     });
+  }
+
+  // ── PR management (not yet implemented for GitHub) ─────────────────────────
+
+  async listPRs(): Promise<PRSummary[]> {
+    throw new Error('flowlane pr list is not yet implemented for GitHub.');
+  }
+
+  async getPR(_prId: number): Promise<PullRequest> {
+    throw new Error('flowlane pr open/view is not yet implemented for GitHub.');
+  }
+
+  async votePR(_prId: number, _vote: PRVote): Promise<void> {
+    throw new Error('flowlane pr vote is not yet implemented for GitHub.');
+  }
+
+  async completePR(_prId: number, _strategy: MergeStrategy): Promise<void> {
+    throw new Error('flowlane pr complete is not yet implemented for GitHub.');
+  }
+
+  async abandonPR(_prId: number): Promise<void> {
+    throw new Error('flowlane pr abandon is not yet implemented for GitHub.');
+  }
+
+  async getThreads(_prId: number, _activeOnly?: boolean): Promise<PRThread[]> {
+    throw new Error('flowlane pr threads is not yet implemented for GitHub.');
   }
 
   // ── helpers ────────────────────────────────────────────────────────────────

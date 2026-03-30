@@ -4,9 +4,39 @@ import type { IGitApi } from 'azure-devops-node-api/GitApi';
 import type { GitPullRequest, CommentThreadStatus } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import type { IPRService, CommentOptions } from '../interfaces/IPRService';
 import type { IConfigService } from '../interfaces/IConfigService';
-import type { PullRequest, CreatePRParams } from '../../types';
+import type {
+  PullRequest,
+  PRSummary,
+  PRThread,
+  PRVote,
+  MergeStrategy,
+  CreatePRParams,
+} from '../../types';
 import { TOKENS } from '../../tokens';
 import { getAzCliToken } from '../../utils/azCliAuth';
+
+// Azure DevOps numeric constants (avoid importing const enums at runtime)
+const PR_STATUS_ACTIVE    = 1;
+const PR_STATUS_ABANDONED = 2;
+const PR_STATUS_COMPLETED = 3;
+
+const THREAD_STATUS_ACTIVE  = 1 as CommentThreadStatus;
+const THREAD_STATUS_PENDING = 6;
+
+const MERGE_STRATEGY: Record<MergeStrategy, number> = {
+  'merge':        1, // noFastForward — merge commit
+  'squash':       2,
+  'rebase':       3,
+  'rebase-merge': 4,
+};
+
+const VOTE_VALUE: Record<PRVote, number> = {
+  'approve':                  10,
+  'approve-with-suggestions':  5,
+  'reset':                     0,
+  'wait':                     -5,
+  'reject':                  -10,
+};
 
 @injectable()
 export class AzureDevOpsPRService implements IPRService {
@@ -14,6 +44,7 @@ export class AzureDevOpsPRService implements IPRService {
   private readonly repo: string;
   private readonly org: string;
   private gitApi: IGitApi | null = null;
+  private currentUserId: string | null = null;
 
   constructor(@inject(TOKENS.ConfigService) private readonly config: IConfigService) {
     this.org     = config.get<string>('org')!;
@@ -79,7 +110,7 @@ export class AzureDevOpsPRService implements IPRService {
 
     const thread: Parameters<IGitApi['createThread']>[0] = {
       comments: [{ content: comment, commentType: 1 }],
-      status: 1 as CommentThreadStatus,
+      status: THREAD_STATUS_ACTIVE,
     };
 
     if (options?.filePath) {
@@ -107,6 +138,114 @@ export class AzureDevOpsPRService implements IPRService {
     );
   }
 
+  // ── New PR management methods ─────────────────────────────────────────────
+
+  async listPRs(): Promise<PRSummary[]> {
+    const api = await this.api();
+    const prs = await api.getPullRequests(
+      this.repo,
+      { status: PR_STATUS_ACTIVE },
+      this.project,
+      undefined, undefined, 100,
+    );
+
+    return prs
+      .filter(pr => pr.pullRequestId != null)
+      .map(pr => ({
+        id:           pr.pullRequestId!,
+        title:        pr.title ?? '',
+        url:          this.prUrl(pr.pullRequestId!),
+        sourceBranch: (pr.sourceRefName ?? '').replace('refs/heads/', ''),
+        targetBranch: (pr.targetRefName ?? '').replace('refs/heads/', ''),
+        author:       pr.createdBy?.displayName ?? pr.createdBy?.uniqueName ?? 'Unknown',
+        authorEmail:  pr.createdBy?.uniqueName ?? '',
+        isDraft:      pr.isDraft ?? false,
+        createdAt:    pr.creationDate ?? new Date(),
+        reviewers:    (pr.reviewers ?? []).map(r => ({
+          name:  r.displayName ?? r.uniqueName ?? '',
+          email: r.uniqueName ?? '',
+          vote:  r.vote ?? 0,
+        })),
+      }));
+  }
+
+  async getPR(prId: number): Promise<PullRequest> {
+    const api = await this.api();
+    const pr  = await api.getPullRequest(this.repo, prId, this.project);
+    if (!pr.pullRequestId) throw new Error(`PR #${prId} not found.`);
+    return {
+      id:     pr.pullRequestId,
+      title:  pr.title ?? '',
+      url:    this.prUrl(pr.pullRequestId),
+      status: String(pr.status ?? 'active'),
+    };
+  }
+
+  async votePR(prId: number, vote: PRVote): Promise<void> {
+    const api    = await this.api();
+    const userId = await this.getCurrentUserId();
+    await api.createPullRequestReviewer(
+      { id: userId, vote: VOTE_VALUE[vote] },
+      this.repo,
+      prId,
+      userId,
+      this.project,
+    );
+  }
+
+  async completePR(prId: number, strategy: MergeStrategy): Promise<void> {
+    const api = await this.api();
+    // Fetch current PR to obtain the last merge source commit — required by the API.
+    const pr = await api.getPullRequest(this.repo, prId, this.project);
+    await api.updatePullRequest(
+      {
+        status: PR_STATUS_COMPLETED,
+        lastMergeSourceCommit: pr.lastMergeSourceCommit,
+        completionOptions: {
+          mergeStrategy:       MERGE_STRATEGY[strategy],
+          deleteSourceBranch:  false,
+          transitionWorkItems: true,
+        },
+      },
+      this.repo,
+      prId,
+      this.project,
+    );
+  }
+
+  async abandonPR(prId: number): Promise<void> {
+    const api = await this.api();
+    await api.updatePullRequest(
+      { status: PR_STATUS_ABANDONED },
+      this.repo,
+      prId,
+      this.project,
+    );
+  }
+
+  async getThreads(prId: number, activeOnly = true): Promise<PRThread[]> {
+    const api     = await this.api();
+    const threads = await api.getThreads(this.repo, prId, this.project);
+
+    return threads
+      .filter(t => t.isDeleted !== true)
+      .filter(t => !activeOnly || t.status === THREAD_STATUS_ACTIVE || t.status === THREAD_STATUS_PENDING)
+      .map(t => ({
+        id:        t.id!,
+        status:    mapThreadStatus(t.status),
+        filePath:  t.threadContext?.filePath?.replace(/^\//, '') ?? undefined,
+        startLine: t.threadContext?.rightFileStart?.line ?? undefined,
+        comments: (t.comments ?? [])
+          .filter(c => !c.isDeleted)
+          .map(c => ({
+            author:      c.author?.displayName ?? c.author?.uniqueName ?? 'Unknown',
+            content:     c.content ?? '',
+            publishedAt: c.publishedDate ?? new Date(),
+          })),
+      }))
+      .filter(t => t.comments.length > 0);
+  }
+
   // ── helpers ────────────────────────────────────────────────────────────────
 
   private async api(): Promise<IGitApi> {
@@ -116,7 +255,28 @@ export class AzureDevOpsPRService implements IPRService {
     return this.gitApi;
   }
 
+  private async getCurrentUserId(): Promise<string> {
+    if (this.currentUserId) return this.currentUserId;
+    const data = await this.createConnection().connect();
+    const id   = data.authenticatedUser?.id;
+    if (!id) throw new Error('Could not resolve current user identity from Azure DevOps.');
+    this.currentUserId = id;
+    return id;
+  }
+
   private prUrl(id: number): string {
     return `https://dev.azure.com/${this.org}/${this.project}/_git/${this.repo}/pullrequest/${id}`;
+  }
+}
+
+function mapThreadStatus(status?: number): PRThread['status'] {
+  switch (status) {
+    case 1: return 'active';
+    case 2:
+    case 3:
+    case 5: return 'resolved';
+    case 4: return 'closed';
+    case 6: return 'pending';
+    default: return 'other';
   }
 }

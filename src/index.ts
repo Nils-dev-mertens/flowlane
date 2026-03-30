@@ -106,6 +106,105 @@ prCmd
     }
   });
 
+prCmd
+  .command('list')
+  .description('List active pull requests grouped by yours and waiting for review')
+  .action(async () => {
+    await ensureConfig();
+    const { prListCommand } = await import('./commands/prList');
+    try {
+      await prListCommand();
+    } catch (err: unknown) {
+      console.error(chalk.red(`Error: ${errMsg(err)}`));
+      process.exit(1);
+    }
+  });
+
+prCmd
+  .command('open [prId]')
+  .description('Open a pull request in the browser (defaults to current branch PR)')
+  .action(async (prId?: string) => {
+    await ensureConfig();
+    const { prOpenCommand } = await import('./commands/prOpen');
+    try {
+      await prOpenCommand(prId);
+    } catch (err: unknown) {
+      console.error(chalk.red(`Error: ${errMsg(err)}`));
+      process.exit(1);
+    }
+  });
+
+prCmd
+  .command('approve [prId]')
+  .description('Approve a pull request (defaults to current branch PR)')
+  .action(async (prId?: string) => {
+    await ensureConfig();
+    const { prApproveCommand } = await import('./commands/prVote');
+    try {
+      await prApproveCommand(prId);
+    } catch (err: unknown) {
+      console.error(chalk.red(`Error: ${errMsg(err)}`));
+      process.exit(1);
+    }
+  });
+
+prCmd
+  .command('vote [prId]')
+  .description('Interactively vote on a pull request (approve / reject / etc.)')
+  .action(async (prId?: string) => {
+    await ensureConfig();
+    const { prVoteCommand } = await import('./commands/prVote');
+    try {
+      await prVoteCommand(prId);
+    } catch (err: unknown) {
+      console.error(chalk.red(`Error: ${errMsg(err)}`));
+      process.exit(1);
+    }
+  });
+
+prCmd
+  .command('complete [prId]')
+  .description('Complete (merge) a pull request with a chosen merge strategy')
+  .action(async (prId?: string) => {
+    await ensureConfig();
+    const { prCompleteCommand } = await import('./commands/prComplete');
+    try {
+      await prCompleteCommand(prId);
+    } catch (err: unknown) {
+      console.error(chalk.red(`Error: ${errMsg(err)}`));
+      process.exit(1);
+    }
+  });
+
+prCmd
+  .command('abandon [prId]')
+  .description('Abandon a pull request (defaults to current branch PR)')
+  .action(async (prId?: string) => {
+    await ensureConfig();
+    const { prAbandonCommand } = await import('./commands/prAbandon');
+    try {
+      await prAbandonCommand(prId);
+    } catch (err: unknown) {
+      console.error(chalk.red(`Error: ${errMsg(err)}`));
+      process.exit(1);
+    }
+  });
+
+prCmd
+  .command('threads [prId]')
+  .description('Show active comment threads on a pull request')
+  .option('--all', 'Include resolved and closed threads')
+  .action(async (prId?: string, opts: { all?: boolean } = {}) => {
+    await ensureConfig();
+    const { prThreadsCommand } = await import('./commands/prThreads');
+    try {
+      await prThreadsCommand(prId, { all: opts.all });
+    } catch (err: unknown) {
+      console.error(chalk.red(`Error: ${errMsg(err)}`));
+      process.exit(1);
+    }
+  });
+
 // ── review ────────────────────────────────────────────────────────────────────
 
 program

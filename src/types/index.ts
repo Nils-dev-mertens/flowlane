@@ -63,6 +63,46 @@ export interface FlowlaneConfig {
   hookAfterComment?: string;
 }
 
+/** Vote options for a pull request reviewer. */
+export type PRVote = 'approve' | 'approve-with-suggestions' | 'wait' | 'reject' | 'reset';
+
+/** Merge strategy when completing a pull request. */
+export type MergeStrategy = 'squash' | 'merge' | 'rebase' | 'rebase-merge';
+
+/** Summary of a pull request returned by the list command. */
+export interface PRSummary {
+  id: number;
+  title: string;
+  url: string;
+  sourceBranch: string;
+  targetBranch: string;
+  /** Display name or email of the PR author. */
+  author: string;
+  /** Email/uniqueName of the PR author — used to match against the configured user. */
+  authorEmail: string;
+  isDraft: boolean;
+  createdAt: Date;
+  reviewers: Array<{
+    name: string;
+    email: string;
+    vote: number;
+  }>;
+}
+
+/** A single comment thread on a pull request. */
+export interface PRThread {
+  id: number;
+  status: 'active' | 'resolved' | 'pending' | 'closed' | 'other';
+  /** File path for inline threads. Undefined for general comments. */
+  filePath?: string;
+  startLine?: number;
+  comments: Array<{
+    author: string;
+    content: string;
+    publishedAt: Date;
+  }>;
+}
+
 export interface CreatePRParams {
   ticketId: string;
   title: string;

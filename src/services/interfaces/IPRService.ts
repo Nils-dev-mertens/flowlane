@@ -1,4 +1,11 @@
-import type { PullRequest, CreatePRParams } from '../../types';
+import type {
+  PullRequest,
+  PRSummary,
+  PRThread,
+  PRVote,
+  MergeStrategy,
+  CreatePRParams,
+} from '../../types';
 
 export interface CommentOptions {
   /** File path for an inline comment (e.g. "src/foo.ts"). */
@@ -18,4 +25,19 @@ export interface IPRService {
   findPRForBranch(branch: string): Promise<PullRequest | null>;
   /** Add a comment (optionally inline) to an existing pull request. */
   addComment(prId: string | number, comment: string, options?: CommentOptions): Promise<void>;
+
+  // ── PR management ──────────────────────────────────────────────────────────
+
+  /** List all active PRs for the configured repository. */
+  listPRs(): Promise<PRSummary[]>;
+  /** Fetch a single PR by ID. */
+  getPR(prId: number): Promise<PullRequest>;
+  /** Cast a reviewer vote on a PR. */
+  votePR(prId: number, vote: PRVote): Promise<void>;
+  /** Complete (merge) a PR with the specified merge strategy. */
+  completePR(prId: number, strategy: MergeStrategy): Promise<void>;
+  /** Abandon a PR. */
+  abandonPR(prId: number): Promise<void>;
+  /** Fetch comment threads. Pass activeOnly=true (default) to skip resolved threads. */
+  getThreads(prId: number, activeOnly?: boolean): Promise<PRThread[]>;
 }
