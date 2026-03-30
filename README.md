@@ -2,7 +2,7 @@
 
 **Ticket → Branch → PR** — command-line workflow automation for Azure DevOps Boards.
 
-flowlane bridges your Azure DevOps board and your local git workflow. Instead of switching between a browser, terminal, and IDE to manage tickets, create branches, and update statuses, flowlane lets you do all of that from a single CLI.
+flowlane bridges your Azure DevOps board and your local git workflow. Instead of switching between a browser, terminal, and IDE to manage tickets, create branches, and update statuses — flowlane lets you do all of that from a single CLI.
 
 ---
 
@@ -33,36 +33,35 @@ flowlane --version
 
 ## First-time setup
 
-Run the interactive setup wizard:
-
 ```bash
 flowlane init
 ```
 
-This will ask for your platform, organisation, project, token, and user identity, then save everything to `~/.config/flowlane/config.json`.
+The interactive wizard asks for your platform, organisation, project, token, and user identity, then saves everything to `~/.config/flowlane/config.json`.
 
-For per-repository overrides (e.g. a different profile or base branch), run:
+For per-repository overrides (e.g. a different profile or base branch):
 
 ```bash
 flowlane profile local
 ```
 
-This creates a `.flowlane` file in the current directory that takes precedence over the global profile.
+This creates a `.flowlane` file in the current repo that takes precedence over the global profile.
 
 ---
 
 ## Commands
 
-### Default — interactive ticket picker
+### `flowlane tickets` — interactive ticket browser
+
+Running `flowlane` with no arguments opens the ticket browser automatically.
 
 ```bash
 flowlane
-# or
 flowlane tickets
 flowlane tickets --user jane.doe@company.com
 ```
 
-Opens a TUI that lists your open tickets, lets you filter them, and offers actions: move to a column, start the full workflow, create a branch, or open a PR.
+Opens an interactive TUI that lists your open tickets. From there you can move a ticket to a column, start the full workflow, create a branch, or open a PR — without leaving the terminal.
 
 ---
 
@@ -81,7 +80,7 @@ flowlane start 1234
 
 ### `flowlane branch <ticketId>`
 
-Fetches the ticket, generates a branch name, creates the branch locally, and pushes it.
+Fetches the ticket, generates a branch name, creates it locally, and pushes it to origin.
 
 ```bash
 flowlane branch 1234
@@ -91,43 +90,77 @@ flowlane branch 1234
 
 ### `flowlane pr [ticketId]`
 
-Creates a pull request linked to the work item. If no ticket ID is given, it is inferred from the current branch name. Falls back to the interactive picker if neither is available.
+Creates a pull request linked to the work item. The ticket ID is inferred from the current branch name if not provided. Falls back to the interactive picker if neither is available.
 
 ```bash
-flowlane pr          # infer ticket from branch name
-flowlane pr 1234     # explicit ticket ID
+flowlane pr          # infer ticket from current branch
+flowlane pr 1234
 ```
 
-> You must be on a git branch (not in a detached HEAD state) to create a PR.
+> You must be on a feature branch (not detached HEAD) to create a PR.
+
+---
+
+### `flowlane pr comment <text>`
+
+Adds a comment to the open PR for the current branch. Supports inline comments targeting a specific file and line range.
+
+```bash
+flowlane pr comment "LGTM, just one nit below"
+
+# Inline comment on a specific file and line
+flowlane pr comment "Extract this into a helper" --file src/utils/branch.ts --line 42
+
+# Multi-line inline comment
+flowlane pr comment "This whole block should be simplified" \
+  --file src/commands/pr.ts --line 10 --end-line 25
+```
+
+| Option | Description |
+|--------|-------------|
+| `--file <path>` | File path for an inline comment |
+| `--line <n>` | Start line (1-based) |
+| `--end-line <n>` | End line for a multi-line comment (defaults to `--line`) |
 
 ---
 
 ### `flowlane review [ticketId]`
 
-Moves a ticket to the "Ready for Review" column (or a custom status via `--status`).
+Moves a ticket to the "Ready for Review" column (or a custom status). Infers the ticket from the current branch if not provided.
 
 ```bash
-flowlane review          # infer ticket from branch name
+flowlane review
 flowlane review 1234
 flowlane review 1234 --status "In Review"
 ```
 
 ---
 
+### `flowlane describe [ticketId]`
+
+Prints the full details of a ticket — ID, title, type, board column, assignee, URL, and description. Infers the ticket from the current branch if not provided.
+
+```bash
+flowlane describe
+flowlane describe 1234
+```
+
+---
+
 ### `flowlane init`
 
-Runs the interactive setup wizard. If profiles already exist, offers to add a new one, configure a local repo override, or list existing profiles.
+Runs the interactive setup wizard. If profiles already exist, it offers to add a new one, configure a local repo override, or list existing profiles.
 
 ---
 
 ### `flowlane profile`
 
-Manage named profiles (each profile holds a separate set of credentials and project settings).
+Manage named profiles. Each profile holds a separate set of credentials and project settings, useful when working across multiple organisations or projects.
 
 ```bash
 flowlane profile list           # list all profiles
-flowlane profile add [name]     # add a new profile
 flowlane profile use <name>     # switch the active profile
+flowlane profile add [name]     # add a new profile (interactive)
 flowlane profile remove <name>  # delete a profile
 flowlane profile local          # write a .flowlane file for the current repo
 ```
@@ -148,26 +181,64 @@ flowlane config set baseBranch develop
 
 ## Configuration reference
 
-Global config is stored at `~/.config/flowlane/config.json` and supports multiple named profiles. A `.flowlane` file in a repo root can override any value for that repo.
+Global config is stored at `~/.config/flowlane/config.json` and supports multiple named profiles. A `.flowlane` file in the repo root overrides any value for that repo.
+
+### Core settings
 
 | Key | Required | Description |
 |-----|----------|-------------|
-| `platform` | ✓ | `azuredevops` (Jira support is planned) |
+| `platform` | ✓ | `azuredevops` (Jira support planned) |
 | `org` | ✓ | Azure DevOps organisation name |
 | `project` | ✓ | Project name |
 | `token` | ✓ | Personal Access Token |
-| `user` | ✓ | Your email or display name (used to filter assigned tickets) |
+| `user` | ✓ | Your email or display name — used to filter assigned tickets |
+| `authMethod` | — | `pat` (default) or `az-cli` — how to authenticate |
 | `repo` | — | Git repository name. Defaults to `project` |
 | `baseBranch` | — | PR target branch. Defaults to `main` |
-| `team` | — | Azure DevOps team name. Required for board column operations |
-| `activeStatus` | — | `System.State` value set when starting work (e.g. `Active`) |
-| `activeColumn` | — | Board column set when starting work (e.g. `Doing`) |
-| `reviewStatus` | — | `System.State` value set on review (e.g. `Active`) |
-| `reviewColumn` | — | Board column set on review (e.g. `Ready for Review`) |
-| `closedStates` | — | Comma-separated states to exclude from ticket list (default: `Done,Removed,Closed,Resolved`) |
 | `baseUrl` | — | Self-hosted Azure DevOps URL |
+| `team` | — | Azure DevOps team name. Required for board column operations |
 
-### Example config (single profile)
+### Workflow status mapping
+
+| Key | Description |
+|-----|-------------|
+| `activeStatus` | `System.State` set when starting work (e.g. `Active`) |
+| `activeColumn` | Board column set when starting work (e.g. `Doing`) |
+| `reviewStatus` | `System.State` set when moving to review (e.g. `Active`) |
+| `reviewColumn` | Board column set when moving to review (e.g. `Ready for Review`) |
+| `closedStates` | Comma-separated states excluded from the ticket list. Defaults to `Done,Removed,Closed,Resolved` |
+
+### Post-action hooks
+
+Shell commands to run automatically after a flowlane action completes. Hooks are optional and never block or roll back the main action if they fail.
+
+| Key | Runs after | Available placeholders |
+|-----|------------|------------------------|
+| `hookAfterBranch` | `flowlane branch` | `{{branch}}`, `{{ticketId}}` |
+| `hookAfterPR` | `flowlane pr` | `{{prUrl}}`, `{{prId}}`, `{{ticketId}}`, `{{branch}}` |
+| `hookAfterReview` | `flowlane review` | `{{ticketId}}` |
+| `hookAfterStart` | `flowlane start` | `{{branch}}`, `{{ticketId}}` — note: `hookAfterBranch` also fires during `start` |
+| `hookAfterComment` | `flowlane pr comment` | `{{prId}}`, `{{branch}}` |
+
+```bash
+# Open the PR in your browser after creating it
+flowlane config set hookAfterPR "open {{prUrl}}"
+
+# Post a Slack message when a branch is pushed
+flowlane config set hookAfterBranch "curl -s -X POST $SLACK_WEBHOOK -d '{\"text\":\"Branch {{branch}} is ready\"}'"
+
+# Open VS Code when starting work
+flowlane config set hookAfterStart "code ."
+
+# Clear a hook
+flowlane config set hookAfterPR ""
+```
+
+---
+
+## Example config
+
+### `~/.config/flowlane/config.json`
 
 ```json
 {
@@ -185,13 +256,14 @@ Global config is stored at `~/.config/flowlane/config.json` and supports multipl
       "activeStatus": "Active",
       "activeColumn": "Doing",
       "reviewStatus": "Active",
-      "reviewColumn": "Ready for Review"
+      "reviewColumn": "Ready for Review",
+      "hookAfterPR": "open {{prUrl}}"
     }
   }
 }
 ```
 
-### Example `.flowlane` (repo-level override)
+### `.flowlane` — repo-level override
 
 ```json
 {
