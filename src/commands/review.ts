@@ -5,6 +5,7 @@ import { TOKENS } from '../tokens';
 import { offerColumnFix } from '../utils/boardStatusFix';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { ITicketService } from '../services/interfaces/ITicketService';
+import { runHook }             from '../utils/hooks';
 
 export interface ReviewOptions {
   /** Called from an interactive TUI session. */
@@ -99,6 +100,8 @@ export async function reviewCommand(
   } else {
     p.log.success(`Status updated to "${chalk.yellow(finalLabel)}".`);
   }
+
+  runHook(cfg.get<string>('hookAfterReview'), { ticketId });
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────

@@ -9,6 +9,7 @@ const VALID_CONFIG_KEYS = new Set<keyof FlowlaneConfig>([
   'platform', 'authMethod', 'org', 'project', 'repo', 'token',
   'user', 'baseBranch', 'baseUrl', 'team', 'activeStatus', 'activeColumn',
   'reviewStatus', 'reviewColumn', 'closedStates',
+  'hookAfterBranch', 'hookAfterPR', 'hookAfterReview', 'hookAfterStart', 'hookAfterComment',
 ]);
 
 export function configSetCommand(key: string, value: string): void {

@@ -50,6 +50,17 @@ export interface FlowlaneConfig {
   reviewColumn?: string;
   /** Comma-separated list of states considered closed/done (excluded from ticket listing). */
   closedStates?: string;
+  // ── Post-action hooks ──────────────────────────────────────────────────────
+  /** Shell command to run after a branch is created. Supports {{branch}}, {{ticketId}}. */
+  hookAfterBranch?: string;
+  /** Shell command to run after a PR is created. Supports {{prUrl}}, {{prId}}, {{ticketId}}, {{branch}}. */
+  hookAfterPR?: string;
+  /** Shell command to run after a ticket is moved to review. Supports {{ticketId}}. */
+  hookAfterReview?: string;
+  /** Shell command to run after `flowlane start` completes. Supports {{branch}}, {{ticketId}}. */
+  hookAfterStart?: string;
+  /** Shell command to run after a PR comment is posted. Supports {{prId}}, {{branch}}. */
+  hookAfterComment?: string;
 }
 
 export interface CreatePRParams {

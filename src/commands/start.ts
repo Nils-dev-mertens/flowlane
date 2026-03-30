@@ -5,6 +5,7 @@ import { TOKENS }    from '../tokens';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { ITicketService } from '../services/interfaces/ITicketService';
 import { branchCommand } from './branch';
+import { runHook }       from '../utils/hooks';
 
 export interface StartOptions {
   /** Called from an interactive TUI session (skip self-contained intro). */
@@ -61,6 +62,8 @@ export async function startCommand(
     `  Branch: ${chalk.green(branchName)}\n` +
     `  Run ${chalk.cyan('flowlane pr ' + ticketId)} when you're ready to open a PR.`,
   );
+
+  runHook(cfg.get<string>('hookAfterStart'), { branch: branchName, ticketId });
 }
 
 function errMsg(err: unknown): string {

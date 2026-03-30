@@ -7,6 +7,7 @@ import type { ITicketService } from '../services/interfaces/ITicketService';
 import type { IPRService }     from '../services/interfaces/IPRService';
 import type { IGitService }    from '../services/interfaces/IGitService';
 import type { PullRequest }    from '../types';
+import { runHook }             from '../utils/hooks';
 
 export interface PROptions {
   /** Called from an interactive TUI session. */
@@ -109,6 +110,13 @@ export async function prCommand(
   } else {
     p.log.success(`Pull request: ${chalk.blue.underline(pr.url)}`);
   }
+
+  runHook(cfg.get<string>('hookAfterPR'), {
+    prUrl:    pr.url,
+    prId:     String(pr.id),
+    ticketId,
+    branch:   sourceBranch,
+  });
 
   return pr;
 }

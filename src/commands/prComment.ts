@@ -3,7 +3,9 @@ import chalk from 'chalk';
 import { execSync } from 'child_process';
 import { container } from '../container';
 import { TOKENS } from '../tokens';
-import type { IPRService } from '../services/interfaces/IPRService';
+import type { IPRService }     from '../services/interfaces/IPRService';
+import type { IConfigService } from '../services/interfaces/IConfigService';
+import { runHook }             from '../utils/hooks';
 
 export interface PrCommentOptions {
   file?: string;
@@ -21,6 +23,7 @@ export async function prCommentCommand(comment: string, options: PrCommentOption
   }
 
   const prSvc = container.resolve<IPRService>(TOKENS.PRService);
+  const cfg   = container.resolve<IConfigService>(TOKENS.ConfigService);
 
   const spinner = p.spinner();
   spinner.start(`Looking for an open PR on branch "${chalk.cyan(branch)}"…`);
@@ -43,4 +46,6 @@ export async function prCommentCommand(comment: string, options: PrCommentOption
     ? ` on ${chalk.dim(options.file)}${options.line ? chalk.dim(`:${options.line}`) : ''}`
     : '';
   p.outro(`${chalk.green('✓')} Comment added to PR #${pr.id}${location}`);
+
+  runHook(cfg.get<string>('hookAfterComment'), { prId: String(pr.id), branch });
 }

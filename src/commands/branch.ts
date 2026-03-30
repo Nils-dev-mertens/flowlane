@@ -6,6 +6,7 @@ import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { ITicketService } from '../services/interfaces/ITicketService';
 import type { IGitService }    from '../services/interfaces/IGitService';
 import { generateBranchName }  from '../utils/branch';
+import { runHook }             from '../utils/hooks';
 
 export interface BranchOptions {
   /** Called from an interactive TUI session (skip self-contained intro/outro). */
@@ -92,6 +93,8 @@ export async function branchCommand(
   } else {
     p.log.success(`Branch ready: ${chalk.green(branchName)}`);
   }
+
+  runHook(cfg.get<string>('hookAfterBranch'), { branch: branchName, ticketId });
 
   return branchName;
 }
