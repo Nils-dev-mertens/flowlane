@@ -2,6 +2,7 @@ import type {
   PullRequest,
   PRSummary,
   PRThread,
+  PRFile,
   PRVote,
   MergeStrategy,
   CreatePRParams,
@@ -40,4 +41,6 @@ export interface IPRService {
   abandonPR(prId: number): Promise<void>;
   /** Fetch comment threads. Pass activeOnly=true (default) to skip resolved threads. */
   getThreads(prId: number, activeOnly?: boolean): Promise<PRThread[]>;
+  /** List all files changed in a pull request (latest iteration). */
+  getChangedFiles(prId: number): Promise<PRFile[]>;
 }

@@ -103,6 +103,14 @@ export interface PRThread {
   }>;
 }
 
+/** A single file changed in a pull request. */
+export interface PRFile {
+  path: string;
+  changeType: 'add' | 'edit' | 'delete' | 'rename' | 'other';
+  /** Original path before rename, if applicable. */
+  originalPath?: string;
+}
+
 export interface CreatePRParams {
   ticketId: string;
   title: string;

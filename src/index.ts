@@ -205,6 +205,20 @@ prCmd
     }
   });
 
+prCmd
+  .command('files [prId]')
+  .description('Review changed files in a PR — view diffs and post inline comments')
+  .action(async (prId?: string) => {
+    await ensureConfig();
+    const { prFilesCommand } = await import('./commands/prFiles');
+    try {
+      await prFilesCommand(prId);
+    } catch (err: unknown) {
+      console.error(chalk.red(`Error: ${errMsg(err)}`));
+      process.exit(1);
+    }
+  });
+
 // ── review ────────────────────────────────────────────────────────────────────
 
 program

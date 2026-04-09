@@ -5,6 +5,7 @@ import type {
   PullRequest,
   PRSummary,
   PRThread,
+  PRFile,
   PRVote,
   MergeStrategy,
   CreatePRParams,
@@ -65,6 +66,10 @@ export class JiraPRService implements IPRService {
   }
 
   async getThreads(_prId: number, _activeOnly?: boolean): Promise<PRThread[]> {
+    throw new Error(NOT_IMPLEMENTED);
+  }
+
+  async getChangedFiles(_prId: number): Promise<PRFile[]> {
     throw new Error(NOT_IMPLEMENTED);
   }
 }

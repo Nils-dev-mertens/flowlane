@@ -5,6 +5,7 @@ import type {
   PullRequest,
   PRSummary,
   PRThread,
+  PRFile,
   PRVote,
   MergeStrategy,
   CreatePRParams,
@@ -126,6 +127,10 @@ export class GitHubVcsService implements IPRService {
 
   async getThreads(_prId: number, _activeOnly?: boolean): Promise<PRThread[]> {
     throw new Error('flowlane pr threads is not yet implemented for GitHub.');
+  }
+
+  async getChangedFiles(_prId: number): Promise<PRFile[]> {
+    throw new Error('flowlane pr files is not yet implemented for GitHub.');
   }
 
   // ── helpers ────────────────────────────────────────────────────────────────

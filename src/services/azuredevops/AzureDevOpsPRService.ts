@@ -8,6 +8,7 @@ import type {
   PullRequest,
   PRSummary,
   PRThread,
+  PRFile,
   PRVote,
   MergeStrategy,
   CreatePRParams,
@@ -246,6 +247,29 @@ export class AzureDevOpsPRService implements IPRService {
       .filter(t => t.comments.length > 0);
   }
 
+  async getChangedFiles(prId: number): Promise<PRFile[]> {
+    const api = await this.api();
+
+    // Get the latest iteration of the PR.
+    const iterations = await api.getPullRequestIterations(this.repo, prId, this.project);
+    if (!iterations.length) return [];
+    const latestIteration = iterations[iterations.length - 1];
+    const iterationId = latestIteration.id;
+    if (!iterationId) return [];
+
+    const changes = await api.getPullRequestIterationChanges(
+      this.repo, prId, iterationId, this.project,
+    );
+
+    return (changes.changeEntries ?? [])
+      .filter(c => c.item?.path)
+      .map(c => ({
+        path:         (c.item!.path!).replace(/^\//, ''),
+        changeType:   mapChangeType(c.changeType ?? 0),
+        originalPath: c.originalPath?.replace(/^\//, '') ?? undefined,
+      }));
+  }
+
   // ── helpers ────────────────────────────────────────────────────────────────
 
   private async api(): Promise<IGitApi> {
@@ -267,6 +291,15 @@ export class AzureDevOpsPRService implements IPRService {
   private prUrl(id: number): string {
     return `https://dev.azure.com/${this.org}/${this.project}/_git/${this.repo}/pullrequest/${id}`;
   }
+}
+
+function mapChangeType(changeType: number): PRFile['changeType'] {
+  // VersionControlChangeType flags: 1=add, 2=edit, 4=delete, 8=rename, 16=undelete, 32=branch
+  if (changeType & 4)  return 'delete';
+  if (changeType & 8)  return 'rename';
+  if (changeType & 1)  return 'add';
+  if (changeType & 2)  return 'edit';
+  return 'other';
 }
 
 function mapThreadStatus(status?: number): PRThread['status'] {
