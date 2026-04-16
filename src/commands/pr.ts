@@ -72,6 +72,8 @@ export async function prCommand(
 
   // ── Confirm in interactive mode ───────────────────────────────────────────
 
+  let isDraft = false;
+
   if (interactive) {
     const confirmed = await p.confirm({
       message:
@@ -85,10 +87,19 @@ export async function prCommand(
     p.log.step(`${chalk.green(sourceBranch)} → ${chalk.blue(targetBranch)}`);
   }
 
+  const draftAnswer = await p.confirm({
+    message: 'Create as draft PR?',
+    initialValue: false,
+  });
+  if (p.isCancel(draftAnswer)) {
+    throw new Error('Cancelled');
+  }
+  isDraft = draftAnswer;
+
   // ── Create PR ─────────────────────────────────────────────────────────────
 
   const prSpinner = p.spinner();
-  prSpinner.start('Creating pull request…');
+  prSpinner.start(`Creating ${isDraft ? 'draft ' : ''}pull request…`);
 
   let pr: PullRequest;
   try {
@@ -98,8 +109,9 @@ export async function prCommand(
       description:  buildDescription(ticket.id, ticket.title, ticket.url),
       sourceBranch,
       targetBranch,
+      isDraft,
     });
-    prSpinner.stop(`PR #${pr.id} created.`);
+    prSpinner.stop(`${isDraft ? 'Draft PR' : 'PR'} #${pr.id} created.`);
   } catch (err: unknown) {
     prSpinner.stop(chalk.red('Failed to create pull request.'));
     throw new Error(`Could not create PR: ${errMsg(err)}`);

@@ -191,6 +191,20 @@ prCmd
   });
 
 prCmd
+  .command('publish [prId]')
+  .description('Publish a draft PR as ready for review (defaults to current branch PR)')
+  .action(async (prId?: string) => {
+    await ensureConfig();
+    const { prPublishCommand } = await import('./commands/prPublish');
+    try {
+      await prPublishCommand(prId);
+    } catch (err: unknown) {
+      console.error(chalk.red(`Error: ${errMsg(err)}`));
+      process.exit(1);
+    }
+  });
+
+prCmd
   .command('threads [prId]')
   .description('Show active comment threads on a pull request')
   .option('--all', 'Include resolved and closed threads')

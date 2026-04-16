@@ -117,6 +117,7 @@ export interface CreatePRParams {
   description?: string;
   sourceBranch: string;
   targetBranch: string;
+  isDraft?: boolean;
 }
 
 // ── Multi-profile config file format ─────────────────────────────────────────

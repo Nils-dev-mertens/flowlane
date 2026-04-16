@@ -65,6 +65,10 @@ export class JiraPRService implements IPRService {
     throw new Error(NOT_IMPLEMENTED);
   }
 
+  async publishPR(_prId: number): Promise<void> {
+    throw new Error(NOT_IMPLEMENTED);
+  }
+
   async getThreads(_prId: number, _activeOnly?: boolean): Promise<PRThread[]> {
     throw new Error(NOT_IMPLEMENTED);
   }

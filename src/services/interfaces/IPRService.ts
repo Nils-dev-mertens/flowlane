@@ -39,6 +39,8 @@ export interface IPRService {
   completePR(prId: number, strategy: MergeStrategy): Promise<void>;
   /** Abandon a PR. */
   abandonPR(prId: number): Promise<void>;
+  /** Publish a draft PR (mark as ready for review). */
+  publishPR(prId: number): Promise<void>;
   /** Fetch comment threads. Pass activeOnly=true (default) to skip resolved threads. */
   getThreads(prId: number, activeOnly?: boolean): Promise<PRThread[]>;
   /** List all files changed in a pull request (latest iteration). */

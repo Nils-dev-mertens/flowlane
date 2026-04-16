@@ -73,6 +73,7 @@ export class AzureDevOpsPRService implements IPRService {
       sourceRefName: `refs/heads/${sourceBranch}`,
       targetRefName: `refs/heads/${targetBranch}`,
       workItemRefs:  [{ id: String(ticketId), url: '' }],
+      isDraft:       params.isDraft ?? false,
     };
 
     const pr = await api.createPullRequest(prRequest, this.repo, this.project);
@@ -218,6 +219,16 @@ export class AzureDevOpsPRService implements IPRService {
     const api = await this.api();
     await api.updatePullRequest(
       { status: PR_STATUS_ABANDONED },
+      this.repo,
+      prId,
+      this.project,
+    );
+  }
+
+  async publishPR(prId: number): Promise<void> {
+    const api = await this.api();
+    await api.updatePullRequest(
+      { isDraft: false },
       this.repo,
       prId,
       this.project,

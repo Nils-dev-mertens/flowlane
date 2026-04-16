@@ -88,6 +88,7 @@ export class GitHubVcsService implements IPRService {
       body:  description ?? '',
       head:  sourceBranch,
       base:  targetBranch,
+      draft: params.isDraft ?? false,
     });
 
     return { id: body.number, title: body.title, url: body.html_url, status: body.state };
@@ -245,6 +246,12 @@ export class GitHubVcsService implements IPRService {
   async abandonPR(prId: number): Promise<void> {
     await this.request('PATCH', `/repos/${this.owner}/${this.repo}/pulls/${prId}`, {
       state: 'closed',
+    });
+  }
+
+  async publishPR(prId: number): Promise<void> {
+    await this.request('PATCH', `/repos/${this.owner}/${this.repo}/pulls/${prId}`, {
+      draft: false,
     });
   }
 
