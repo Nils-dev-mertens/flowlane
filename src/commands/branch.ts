@@ -5,7 +5,7 @@ import { TOKENS } from '../tokens';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { ITicketService } from '../services/interfaces/ITicketService';
 import type { IGitService }    from '../services/interfaces/IGitService';
-import { generateBranchName }  from '../utils/branch';
+import { generateBranchName, titleIsTruncated } from '../utils/branch';
 import { runHook }             from '../utils/hooks';
 
 export interface BranchOptions {
@@ -48,13 +48,26 @@ export async function branchCommand(
     throw new Error(`Could not fetch ticket ${ticketId}: ${errMsg(err)}`);
   }
 
-  const branchName = generateBranchName(ticket.id, ticket.title);
+  const generatedName = generateBranchName(ticket.id, ticket.title);
+  const wasTruncated  = titleIsTruncated(ticket.title);
 
-  // ── Confirm branch name (interactive mode) ────────────────────────────────
+  // ── Confirm / edit branch name ────────────────────────────────────────────
 
-  if (interactive) {
+  let branchName = generatedName;
+
+  if (wasTruncated) {
+    // Title was longer than the 4-word slug limit — let the user confirm or edit.
+    p.log.warn(`Title is long; branch name was shortened to: ${chalk.green(generatedName)}`);
+    const edited = await p.text({
+      message: 'Branch name (edit if needed, Enter to accept):',
+      initialValue: generatedName,
+      validate: (v) => v.trim() ? undefined : 'Branch name cannot be empty',
+    });
+    if (p.isCancel(edited)) throw new Error('Cancelled');
+    branchName = (edited as string).trim();
+  } else if (interactive) {
     const confirmed = await p.confirm({
-      message: `Create branch ${chalk.green(branchName)}?`,
+      message: `Create branch ${chalk.green(generatedName)}?`,
       initialValue: true,
     });
     if (p.isCancel(confirmed) || !confirmed) {

@@ -36,6 +36,26 @@ export class GitService implements IGitService {
     }
   }
 
+  listBranches(ticketId?: string): string[] {
+    try {
+      const output = this.exec(['branch', '--format=%(refname:short)']);
+      const branches = output.split('\n').map((b) => b.trim()).filter(Boolean);
+      if (!ticketId) return branches;
+      const prefix = ticketId.toLowerCase();
+      return branches.filter((b) => b === prefix || b.startsWith(`${prefix}-`));
+    } catch (err: unknown) {
+      throw new Error(`Failed to list branches: ${this.errMsg(err)}`);
+    }
+  }
+
+  switchBranch(name: string): void {
+    try {
+      this.exec(['checkout', name]);
+    } catch (err: unknown) {
+      throw new Error(`Failed to switch to branch "${name}": ${this.errMsg(err)}`);
+    }
+  }
+
   private exec(args: string[]): string {
     return execFileSync('git', args, { encoding: 'utf8', stdio: 'pipe' });
   }

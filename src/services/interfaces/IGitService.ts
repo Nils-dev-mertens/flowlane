@@ -7,4 +7,8 @@ export interface IGitService {
   publishBranch(name: string): void;
   /** Return the name of the currently checked-out branch. */
   getCurrentBranch(): string;
+  /** Return all local branches, optionally filtered by ticket ID prefix. */
+  listBranches(ticketId?: string): string[];
+  /** Switch to an existing local branch. */
+  switchBranch(name: string): void;
 }

@@ -8,6 +8,7 @@ import { getAzCliToken } from '../utils/azCliAuth';
 import { ticketIdFromBranch } from '../utils/branch';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { ITicketService } from '../services/interfaces/ITicketService';
+import type { IGitService } from '../services/interfaces/IGitService';
 import type { Ticket } from '../types';
 
 export interface TicketsOptions {
@@ -181,12 +182,24 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
     'push',
   ].filter(Boolean).join(' → ');
 
+  // Check for existing local branches for this ticket to show the switch option.
+  const gitSvc = container.resolve<IGitService>(TOKENS.GitService);
+  let existingBranches: string[] = [];
+  try {
+    existingBranches = gitSvc.listBranches(ticketId as string);
+  } catch { /* not in a git repo or no branches */ }
+
+  const switchHint = existingBranches.length > 0
+    ? existingBranches.join(', ')
+    : 'no local branches found for this ticket';
+
   const action = await p.select({
     message: 'What would you like to do?',
     options: [
       { value: 'column',     label: 'Change column / status',  hint: 'move ticket to any column on the board' },
       { value: 'start',      label: chalk.bold('Full workflow'), hint: startHint },
       { value: 'branch',     label: 'Create & push branch' },
+      { value: 'switch',     label: 'Switch to branch',         hint: switchHint },
       { value: 'pr',         label: 'Create pull request' },
       { value: 'pr-comment', label: 'Add comment to PR',       hint: 'post a comment on the open PR for the current branch' },
     ],
@@ -271,6 +284,29 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
     case 'branch':
       await branchCommand(ticketId as string, { interactive: true });
       break;
+    case 'switch': {
+      if (existingBranches.length === 0) {
+        p.outro(chalk.yellow('No local branches found for this ticket. Create one first.'));
+        break;
+      }
+
+      const target = existingBranches.length === 1
+        ? existingBranches[0]
+        : await p.select({
+            message: 'Switch to which branch?',
+            options: existingBranches.map((b) => ({ value: b, label: b })),
+          }) as string;
+
+      if (p.isCancel(target)) { p.outro('Cancelled.'); break; }
+
+      try {
+        gitSvc.switchBranch(target as string);
+        p.outro(`${chalk.green('✓')} Switched to ${chalk.green(target as string)}`);
+      } catch (err: unknown) {
+        p.outro(chalk.red(`Failed to switch branch: ${errMsg(err)}`));
+      }
+      break;
+    }
     case 'pr':
       await prCommand(ticketId as string, { interactive: true });
       break;

@@ -1,22 +1,36 @@
+const MAX_SLUG_WORDS = 4;
+
 /**
  * Generates a git branch name from a ticket ID and title.
+ * Only the first MAX_SLUG_WORDS words of the title are used.
  *
  * Examples:
- *   generateBranchName('123',      'Fix login button')   → '123-fix-login-button'
- *   generateBranchName('PROJ-456', 'Add dark mode')      → 'proj-456-add-dark-mode'
+ *   generateBranchName('123',      'Fix login button')          → '123-fix-login-button'
+ *   generateBranchName('PROJ-456', 'Add dark mode')             → 'proj-456-add-dark-mode'
+ *   generateBranchName('789',      'A very long title with many words here')
+ *                                                                → '789-a-very-long-title'
  */
 export function generateBranchName(ticketId: string, title: string): string {
-  const slug = title
+  const words = title
     .toLowerCase()
     .replace(/[^\w\s-]/g, '')   // drop special chars except hyphens
     .trim()
-    .replace(/\s+/g, '-')       // spaces → hyphens
-    .replace(/-+/g, '-')        // collapse consecutive hyphens
-    .replace(/^-|-$/g, '')      // trim leading/trailing hyphens
-    .slice(0, 50);              // cap length
+    .split(/\s+/)
+    .filter(Boolean);
+
+  const slug = words
+    .slice(0, MAX_SLUG_WORDS)
+    .join('-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
 
   const idPart = ticketId.toLowerCase().replace(/\s+/g, '-');
   return `${idPart}-${slug}`;
+}
+
+/** Returns true when the title has more words than the branch slug limit. */
+export function titleIsTruncated(title: string): boolean {
+  return title.trim().split(/\s+/).filter(Boolean).length > MAX_SLUG_WORDS;
 }
 
 /**
