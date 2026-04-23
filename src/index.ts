@@ -42,7 +42,10 @@ program
   .command('tickets')
   .description('Browse tickets assigned to you and take action (interactive TUI)')
   .option('--user <user>', 'Override the configured user identity')
-  .action(async (opts: { user?: string }) => {
+  .option('--filter <text>', 'Pre-filter by ID, title, or status (skips the TUI prompt)')
+  .option('--status <status>', 'Only show tickets whose status or column matches this value')
+  .option('--json', 'Output tickets as JSON')
+  .action(async (opts: { user?: string; filter?: string; status?: string; json?: boolean }) => {
     await ensureConfig();
     const { ticketsCommand } = await import('./commands/tickets');
     await ticketsCommand(opts);
@@ -109,11 +112,14 @@ prCmd
 prCmd
   .command('list')
   .description('List active pull requests grouped by yours and waiting for review')
-  .action(async () => {
+  .option('--json', 'Output PRs as JSON')
+  .option('--mine', 'Only show PRs authored by you')
+  .option('--draft', 'Only show draft PRs')
+  .action(async (opts: { json?: boolean; mine?: boolean; draft?: boolean }) => {
     await ensureConfig();
     const { prListCommand } = await import('./commands/prList');
     try {
-      await prListCommand();
+      await prListCommand(opts);
     } catch (err: unknown) {
       console.error(chalk.red(`Error: ${errMsg(err)}`));
       process.exit(1);
@@ -208,11 +214,12 @@ prCmd
   .command('threads [prId]')
   .description('Show active comment threads on a pull request')
   .option('--all', 'Include resolved and closed threads')
-  .action(async (prId?: string, opts: { all?: boolean } = {}) => {
+  .option('--json', 'Output threads as JSON')
+  .action(async (prId?: string, opts: { all?: boolean; json?: boolean } = {}) => {
     await ensureConfig();
     const { prThreadsCommand } = await import('./commands/prThreads');
     try {
-      await prThreadsCommand(prId, { all: opts.all });
+      await prThreadsCommand(prId, { all: opts.all, json: opts.json });
     } catch (err: unknown) {
       console.error(chalk.red(`Error: ${errMsg(err)}`));
       process.exit(1);
@@ -222,11 +229,12 @@ prCmd
 prCmd
   .command('files [prId]')
   .description('Review changed files in a PR — view diffs and post inline comments')
-  .action(async (prId?: string) => {
+  .option('--json', 'Output changed files as JSON')
+  .action(async (prId?: string, opts: { json?: boolean } = {}) => {
     await ensureConfig();
     const { prFilesCommand } = await import('./commands/prFiles');
     try {
-      await prFilesCommand(prId);
+      await prFilesCommand(prId, opts);
     } catch (err: unknown) {
       console.error(chalk.red(`Error: ${errMsg(err)}`));
       process.exit(1);
@@ -261,7 +269,8 @@ program
 program
   .command('describe [ticketId]')
   .description('Show the full description of a ticket (defaults to current branch ticket)')
-  .action(async (ticketId?: string) => {
+  .option('--json', 'Output ticket as JSON')
+  .action(async (ticketId?: string, opts: { json?: boolean } = {}) => {
     await ensureConfig();
     const id = resolveTicketId(ticketId);
     if (!id) {
@@ -270,7 +279,7 @@ program
     }
     const { describeCommand } = await import('./commands/describe');
     try {
-      await describeCommand(id);
+      await describeCommand(id, opts);
     } catch (err: unknown) {
       console.error(chalk.red(`Error: ${errMsg(err)}`));
       process.exit(1);
@@ -359,9 +368,10 @@ configCmd
 configCmd
   .command('list')
   .description('List all config values')
-  .action(() => {
+  .option('--json', 'Output config as JSON')
+  .action((opts: { json?: boolean }) => {
     const { configListCommand } = require('./commands/config') as typeof import('./commands/config');
-    configListCommand();
+    configListCommand(opts);
   });
 
 // ── Default: no args → launch interactive ticket picker ───────────────────────

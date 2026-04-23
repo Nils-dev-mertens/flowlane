@@ -3,45 +3,79 @@ import chalk from 'chalk';
 import { execSync } from 'child_process';
 import { container }      from '../container';
 import { TOKENS }         from '../tokens';
+import { isInteractive }  from '../utils/tty';
 import type { IPRService } from '../services/interfaces/IPRService';
 import type { PRFile, PRSummary } from '../types';
 import { resolvePRId }    from '../utils/prResolve';
 
+export interface PrFilesOptions {
+  json?: boolean;
+}
+
 /**
  * Interactive file-by-file PR review.
  * Shows changed files, lets the user view diffs and post inline comments.
+ * In non-interactive / --json mode, just lists the changed files.
  */
-export async function prFilesCommand(prId?: string): Promise<void> {
-  p.intro(chalk.bgCyan.black('  flowlane pr files  '));
+export async function prFilesCommand(prId?: string, options: PrFilesOptions = {}): Promise<void> {
+  const interactive = isInteractive() && !options.json;
+  const prSvc       = container.resolve<IPRService>(TOKENS.PRService);
 
-  const prSvc = container.resolve<IPRService>(TOKENS.PRService);
+  if (interactive) p.intro(chalk.bgCyan.black('  flowlane pr files  '));
 
   let id: number;
   try {
     id = await resolvePRId(prSvc, prId);
   } catch (err: unknown) {
-    p.outro(chalk.red(errMsg(err)));
+    if (interactive) { p.outro(chalk.red(errMsg(err))); }
+    else { process.stderr.write(`Error: ${errMsg(err)}\n`); }
     process.exit(1);
   }
 
-  const spinner = p.spinner();
-  spinner.start(`Loading PR #${chalk.cyan(id)} files…`);
-
   let files: PRFile[];
   let pr: PRSummary | undefined;
-  try {
-    [files, pr] = await Promise.all([
-      prSvc.getChangedFiles(id),
-      prSvc.listPRs().then(list => list.find(p => p.id === id)),
-    ]);
-    spinner.stop(`${files.length} file${files.length !== 1 ? 's' : ''} changed.`);
-  } catch (err: unknown) {
-    spinner.stop(chalk.red('Failed to load files.'));
-    throw new Error(errMsg(err));
+
+  if (interactive) {
+    const spinner = p.spinner();
+    spinner.start(`Loading PR #${chalk.cyan(id)} files…`);
+    try {
+      [files, pr] = await Promise.all([
+        prSvc.getChangedFiles(id),
+        prSvc.listPRs().then(list => list.find(p => p.id === id)),
+      ]);
+      spinner.stop(`${files.length} file${files.length !== 1 ? 's' : ''} changed.`);
+    } catch (err: unknown) {
+      spinner.stop(chalk.red('Failed to load files.'));
+      throw new Error(errMsg(err));
+    }
+  } else {
+    try {
+      [files, pr] = await Promise.all([
+        prSvc.getChangedFiles(id),
+        prSvc.listPRs().then(list => list.find(p => p.id === id)),
+      ]);
+    } catch (err: unknown) {
+      if (options.json) process.stdout.write(JSON.stringify({ error: errMsg(err) }) + '\n');
+      else process.stderr.write(`Error: ${errMsg(err)}\n`);
+      process.exit(1);
+    }
+  }
+
+  if (options.json) {
+    process.stdout.write(JSON.stringify(files, null, 2) + '\n');
+    return;
   }
 
   if (files.length === 0) {
-    p.outro(chalk.dim('No file changes found on this PR.'));
+    if (interactive) p.outro(chalk.dim('No file changes found on this PR.'));
+    else process.stdout.write('No file changes found on this PR.\n');
+    return;
+  }
+
+  if (!interactive) {
+    for (const f of files) {
+      process.stdout.write(`${f.changeType}\t${f.path}${f.originalPath ? `\t${f.originalPath}` : ''}\n`);
+    }
     return;
   }
 

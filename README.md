@@ -59,9 +59,26 @@ Running `flowlane` with no arguments opens the ticket browser automatically.
 flowlane
 flowlane tickets
 flowlane tickets --user jane.doe@company.com
+
+# Filter without opening the TUI
+flowlane tickets --filter "auth"
+flowlane tickets --status "In Progress"
+
+# Machine-readable output
+flowlane tickets --json
+flowlane tickets --filter "auth" --status "Active" --json
 ```
 
 Opens an interactive TUI that lists your open tickets. From there you can move a ticket to a column, start the full workflow, create a branch, or open a PR — without leaving the terminal.
+
+When stdout is not a TTY (piped, redirected, or `CI=true`), the TUI is skipped automatically and tickets are printed as tab-separated lines. Use `--json` for structured output.
+
+| Option | Description |
+|--------|-------------|
+| `--user <user>` | Override the configured user identity |
+| `--filter <text>` | Pre-filter by ID, title, or status (skips the TUI prompt) |
+| `--status <status>` | Only show tickets matching this status or board column |
+| `--json` | Output tickets as a JSON array |
 
 ---
 
@@ -124,6 +141,68 @@ flowlane pr comment "This whole block should be simplified" \
 
 ---
 
+### `flowlane pr list`
+
+Lists active pull requests grouped into yours, waiting for your review, and other.
+
+```bash
+flowlane pr list
+
+# Filters
+flowlane pr list --mine
+flowlane pr list --draft
+flowlane pr list --mine --draft
+
+# Machine-readable output
+flowlane pr list --json
+```
+
+| Option | Description |
+|--------|-------------|
+| `--mine` | Only show PRs you authored |
+| `--draft` | Only show draft PRs |
+| `--json` | Output as JSON: `{ mine, toReview, other }` |
+
+---
+
+### `flowlane pr threads [prId]`
+
+Shows comment threads on a pull request. Infers the PR from the current branch if not provided.
+
+```bash
+flowlane pr threads
+flowlane pr threads 42
+flowlane pr threads --all          # include resolved threads
+flowlane pr threads 42 --json
+```
+
+---
+
+### `flowlane pr files [prId]`
+
+Interactive file-by-file PR review — shows changed files, lets you view diffs and post inline comments. In non-interactive mode (piped or `--json`) it just lists the changed files.
+
+```bash
+flowlane pr files
+flowlane pr files 42
+flowlane pr files 42 --json        # outputs PRFile[] array
+```
+
+---
+
+### `flowlane pr vote [prId]` / `pr approve` / `pr complete` / `pr abandon` / `pr publish`
+
+```bash
+flowlane pr vote 42        # interactive vote picker
+flowlane pr approve 42     # approve immediately
+flowlane pr complete 42    # merge with strategy picker
+flowlane pr abandon 42     # close without merging
+flowlane pr publish 42     # mark draft as ready for review
+flowlane pr open 42        # open in browser
+```
+
+---
+
 ### `flowlane review [ticketId]`
 
 Moves a ticket to the "Ready for Review" column (or a custom status). Infers the ticket from the current branch if not provided.
@@ -143,6 +222,7 @@ Prints the full details of a ticket — ID, title, type, board column, assignee,
 ```bash
 flowlane describe
 flowlane describe 1234
+flowlane describe 1234 --json
 ```
 
 ---
@@ -173,9 +253,42 @@ Read or update individual config values in the active profile.
 
 ```bash
 flowlane config list
+flowlane config list --json        # outputs full config as JSON (token masked)
 flowlane config get baseBranch
 flowlane config set baseBranch develop
 ```
+
+---
+
+## Scripting & automation
+
+flowlane works cleanly in scripts, CI pipelines, and AI agent workflows.
+
+**Automatic non-interactive mode** — when stdout is not a TTY (piped, redirected, or `CI=true`), all TUI prompts are skipped automatically. No flags needed.
+
+**JSON output** — add `--json` to any read command to get structured data on stdout. Progress and errors go to stderr so they never pollute the JSON stream.
+
+```bash
+# List tickets and pipe to jq
+flowlane tickets --json | jq '.[] | select(.status == "Active") | .id'
+
+# Get a specific ticket
+flowlane describe 1234 --json | jq '{id, title, status}'
+
+# List PRs waiting for your review
+flowlane pr list --json | jq '.toReview[].id'
+
+# Get open comment threads on the current branch's PR
+flowlane pr threads --json | jq '.[] | {file: .filePath, line: .startLine, comment: .comments[0].content}'
+
+# List changed files in a PR
+flowlane pr files 42 --json | jq '.[].path'
+
+# Get current config (token masked)
+flowlane config list --json | jq '.org'
+```
+
+**Exit codes** — all commands exit `0` on success and `1` on error. In `--json` mode, errors are written as `{"error": "..."}` to stdout alongside the non-zero exit code.
 
 ---
 

@@ -41,11 +41,20 @@ export function configGetCommand(key: string): void {
   }
 }
 
-export function configListCommand(): void {
+export function configListCommand(options: { json?: boolean } = {}): void {
   const cfg = container.resolve<ConfigService>(TOKENS.ConfigService);
 
   if (!cfg.exists()) {
-    console.log(chalk.yellow('No config found. Run: flowlane init'));
+    if (options.json) process.stdout.write(JSON.stringify({ error: 'No config found.' }) + '\n');
+    else console.log(chalk.yellow('No config found. Run: flowlane init'));
+    return;
+  }
+
+  const config = cfg.getAll();
+
+  if (options.json) {
+    const safe = { ...config, token: config.token ? '***' : undefined };
+    process.stdout.write(JSON.stringify(safe, null, 2) + '\n');
     return;
   }
 
@@ -58,7 +67,6 @@ export function configListCommand(): void {
     (localPath   ? chalk.dim(` — local: ${localPath}`) : ''),
   );
 
-  const config = cfg.getAll();
   for (const [key, value] of Object.entries(config)) {
     const display = key === 'token' ? chalk.dim('***') : String(value);
     console.log(`  ${chalk.cyan(key.padEnd(14))} ${display}`);

@@ -6,6 +6,7 @@ import { TOKENS } from '../tokens';
 import { fetchBoardColumns } from '../utils/azureBoard';
 import { getAzCliToken } from '../utils/azCliAuth';
 import { ticketIdFromBranch } from '../utils/branch';
+import { isInteractive } from '../utils/tty';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { ITicketService } from '../services/interfaces/ITicketService';
 import type { IGitService } from '../services/interfaces/IGitService';
@@ -13,10 +14,72 @@ import type { Ticket } from '../types';
 
 export interface TicketsOptions {
   user?: string;
+  /** Pre-apply a text filter (skips the TUI filter prompt). */
+  filter?: string;
+  /** Only show tickets whose status or boardColumn matches this value. */
+  status?: string;
+  /** Output tickets as JSON instead of launching the TUI. */
+  json?: boolean;
 }
 
 export async function ticketsCommand(options: TicketsOptions = {}): Promise<void> {
   const cfg = container.resolve<IConfigService>(TOKENS.ConfigService);
+
+  // ── Non-interactive / JSON mode ───────────────────────────────────────────
+
+  if (!isInteractive() || options.json) {
+    const ticketSvc = container.resolve<ITicketService>(TOKENS.TicketService);
+    const user      = (options.user ?? cfg.get<string>('user') ?? '').trim();
+
+    process.stderr.write(`Fetching tickets for ${user}…\n`);
+
+    let tickets: Ticket[];
+    try {
+      tickets = await ticketSvc.getTicketsForUser(user);
+    } catch (err: unknown) {
+      if (options.json) {
+        process.stdout.write(JSON.stringify({ error: errMsg(err) }) + '\n');
+      } else {
+        process.stderr.write(`Error: ${errMsg(err)}\n`);
+      }
+      process.exit(1);
+    }
+
+    const assigned = tickets.filter((t) => !t.isContext);
+
+    // Apply --filter (text search)
+    const filterText = (options.filter ?? '').trim().toLowerCase();
+    const filtered = filterText
+      ? assigned.filter(
+          (t) =>
+            t.id.toLowerCase().includes(filterText) ||
+            t.title.toLowerCase().includes(filterText) ||
+            t.status.toLowerCase().includes(filterText),
+        )
+      : assigned;
+
+    // Apply --status
+    const statusFilter = (options.status ?? '').trim().toLowerCase();
+    const result = statusFilter
+      ? filtered.filter(
+          (t) =>
+            t.status.toLowerCase().includes(statusFilter) ||
+            (t.boardColumn ?? '').toLowerCase().includes(statusFilter),
+        )
+      : filtered;
+
+    if (options.json) {
+      process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+    } else {
+      for (const t of result) {
+        const col = t.boardColumn ?? t.status;
+        process.stdout.write(`${t.id}\t${col}\t${t.title}\n`);
+      }
+    }
+    return;
+  }
+
+  // ── Interactive TUI mode ──────────────────────────────────────────────────
 
   p.intro(
     chalk.bgCyan.black('  flowlane  ') +
@@ -48,10 +111,12 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
 
   // ── Optional filter ───────────────────────────────────────────────────────
 
-  const filterRaw = await p.text({
-    message: 'Filter tickets (press Enter to show all):',
-    placeholder: 'Search by ID, title, or status…',
-  });
+  const filterRaw = options.filter !== undefined
+    ? options.filter
+    : await p.text({
+        message: 'Filter tickets (press Enter to show all):',
+        placeholder: 'Search by ID, title, or status…',
+      });
 
   if (p.isCancel(filterRaw)) { p.outro('Cancelled.'); return; }
 
@@ -61,14 +126,26 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
   const assigned = tickets.filter((t) => !t.isContext);
   const contextById = new Map(tickets.filter((t) => t.isContext).map((t) => [t.id, t]));
 
-  const filteredAssigned = filter
-    ? assigned.filter(
+  const statusFilter = (options.status ?? '').trim().toLowerCase();
+
+  const filteredAssigned = (() => {
+    let result = filter
+      ? assigned.filter(
+          (t) =>
+            t.id.toLowerCase().includes(filter) ||
+            t.title.toLowerCase().includes(filter) ||
+            t.status.toLowerCase().includes(filter),
+        )
+      : assigned;
+    if (statusFilter) {
+      result = result.filter(
         (t) =>
-          t.id.toLowerCase().includes(filter) ||
-          t.title.toLowerCase().includes(filter) ||
-          t.status.toLowerCase().includes(filter),
-      )
-    : assigned;
+          t.status.toLowerCase().includes(statusFilter) ||
+          (t.boardColumn ?? '').toLowerCase().includes(statusFilter),
+      );
+    }
+    return result;
+  })();
 
   if (filteredAssigned.length === 0) {
     p.outro(chalk.yellow(filter ? `No tickets match "${filter}".` : `No open tickets assigned to "${user}".`));
