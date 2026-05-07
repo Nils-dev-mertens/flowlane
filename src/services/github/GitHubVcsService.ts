@@ -316,6 +316,18 @@ export class GitHubVcsService implements IPRService {
     return threads;
   }
 
+  async resolveThread(_prId: number, _threadId: number): Promise<void> {
+    // GitHub thread resolution is only available via GraphQL, not the REST API.
+    throw new Error('Thread resolution is not supported for GitHub via the REST API. Use the GitHub web interface to resolve review threads.');
+  }
+
+  async replyToThread(prId: number, threadId: number, comment: string): Promise<void> {
+    await this.request('POST', `/repos/${this.owner}/${this.repo}/pulls/${prId}/comments`, {
+      body:        comment,
+      in_reply_to: threadId,
+    });
+  }
+
   async getChangedFiles(prId: number): Promise<PRFile[]> {
     const files = await this.request<GHPullFile[]>(
       'GET',

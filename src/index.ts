@@ -210,7 +210,7 @@ prCmd
     }
   });
 
-prCmd
+const threadsCmd = prCmd
   .command('threads [prId]')
   .description('Show active comment threads on a pull request')
   .option('--all', 'Include resolved and closed threads')
@@ -220,6 +220,34 @@ prCmd
     const { prThreadsCommand } = await import('./commands/prThreads');
     try {
       await prThreadsCommand(prId, { all: opts.all, json: opts.json });
+    } catch (err: unknown) {
+      console.error(chalk.red(`Error: ${errMsg(err)}`));
+      process.exit(1);
+    }
+  });
+
+threadsCmd
+  .command('resolve <threadId> [prId]')
+  .description('Resolve a comment thread by its ID')
+  .action(async (threadId: string, prId?: string) => {
+    await ensureConfig();
+    const { prResolveThreadCommand } = await import('./commands/prResolveThread');
+    try {
+      await prResolveThreadCommand(threadId, prId);
+    } catch (err: unknown) {
+      console.error(chalk.red(`Error: ${errMsg(err)}`));
+      process.exit(1);
+    }
+  });
+
+threadsCmd
+  .command('reply <threadId> <text> [prId]')
+  .description('Reply to a comment thread by its ID')
+  .action(async (threadId: string, text: string, prId?: string) => {
+    await ensureConfig();
+    const { prReplyThreadCommand } = await import('./commands/prReplyThread');
+    try {
+      await prReplyThreadCommand(threadId, text, prId);
     } catch (err: unknown) {
       console.error(chalk.red(`Error: ${errMsg(err)}`));
       process.exit(1);

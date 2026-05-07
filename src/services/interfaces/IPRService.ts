@@ -43,6 +43,10 @@ export interface IPRService {
   publishPR(prId: number): Promise<void>;
   /** Fetch comment threads. Pass activeOnly=true (default) to skip resolved threads. */
   getThreads(prId: number, activeOnly?: boolean): Promise<PRThread[]>;
+  /** Resolve (close) a comment thread on a pull request. */
+  resolveThread(prId: number, threadId: number): Promise<void>;
+  /** Reply to an existing comment thread on a pull request. */
+  replyToThread(prId: number, threadId: number, comment: string): Promise<void>;
   /** List all files changed in a pull request (latest iteration). */
   getChangedFiles(prId: number): Promise<PRFile[]>;
 }

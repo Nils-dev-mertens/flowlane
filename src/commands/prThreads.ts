@@ -7,6 +7,8 @@ import type { IPRService } from '../services/interfaces/IPRService';
 import type { PRThread }   from '../types';
 import { resolvePRId }     from '../utils/prResolve';
 
+type ThreadAction = 'resolve' | 'reply' | 'none';
+
 export interface PrThreadsOptions {
   /** Show all threads including resolved ones. Default: active/pending only. */
   all?: boolean;
@@ -81,6 +83,7 @@ export async function prThreadsCommand(prId?: string, options: PrThreadsOptions 
   threads.forEach((thread, i) => printThread(thread, i + 1));
 
   if (interactive) {
+    await promptThreadAction(prSvc, id, threads);
     p.outro(
       activeOnly
         ? chalk.dim('Run with --all to include resolved threads.')
@@ -143,6 +146,65 @@ function formatAge(date: Date): string {
   if (days > 0)  return `${days}d ago`;
   if (hours > 0) return `${hours}h ago`;
   return `${mins}m ago`;
+}
+
+async function promptThreadAction(
+  prSvc: IPRService,
+  prId: number,
+  threads: PRThread[],
+): Promise<void> {
+  const selectOptions = [
+    { value: 'none', label: 'Nothing — done' },
+    ...threads.map((t, i) => ({
+      value: String(t.id),
+      label: `Thread #${i + 1}  ${t.filePath ? chalk.dim(t.filePath + (t.startLine ? `:${t.startLine}` : '')) : chalk.dim('General')}  — ${t.comments[0]?.author ?? '?'}: ${t.comments[0]?.content.slice(0, 50) ?? ''}`,
+    })),
+  ];
+
+  const selected = await p.select<{ value: string; label: string }[], string>({
+    message: 'Act on a thread?',
+    options: selectOptions,
+  });
+
+  if (p.isCancel(selected) || selected === 'none') return;
+
+  const threadId = Number(selected);
+
+  const action = await p.select<{ value: ThreadAction; label: string }[], ThreadAction>({
+    message: 'What would you like to do?',
+    options: [
+      { value: 'resolve', label: 'Resolve thread' },
+      { value: 'reply',   label: 'Reply to thread' },
+      { value: 'none',    label: 'Cancel' },
+    ],
+  });
+
+  if (p.isCancel(action) || action === 'none') return;
+
+  if (action === 'resolve') {
+    const spinner = p.spinner();
+    spinner.start('Resolving thread…');
+    try {
+      await prSvc.resolveThread(prId, threadId);
+      spinner.stop(chalk.green('Thread resolved.'));
+    } catch (err: unknown) {
+      spinner.stop(chalk.red(`Failed: ${errMsg(err)}`));
+    }
+    return;
+  }
+
+  // reply
+  const text = await p.text({ message: 'Your reply:', placeholder: 'Type your reply…' });
+  if (p.isCancel(text) || !text) return;
+
+  const spinner = p.spinner();
+  spinner.start('Posting reply…');
+  try {
+    await prSvc.replyToThread(prId, threadId, text);
+    spinner.stop(chalk.green('Reply posted.'));
+  } catch (err: unknown) {
+    spinner.stop(chalk.red(`Failed: ${errMsg(err)}`));
+  }
 }
 
 function errMsg(err: unknown): string {

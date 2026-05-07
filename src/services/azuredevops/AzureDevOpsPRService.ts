@@ -258,6 +258,17 @@ export class AzureDevOpsPRService implements IPRService {
       .filter(t => t.comments.length > 0);
   }
 
+  async resolveThread(prId: number, threadId: number): Promise<void> {
+    const api = await this.api();
+    // status 2 = Fixed (resolved) in Azure DevOps CommentThreadStatus
+    await api.updateThread({ status: 2 as CommentThreadStatus }, this.repo, prId, threadId, this.project);
+  }
+
+  async replyToThread(prId: number, threadId: number, comment: string): Promise<void> {
+    const api = await this.api();
+    await api.createComment({ content: comment, commentType: 1 }, this.repo, prId, threadId, this.project);
+  }
+
   async getChangedFiles(prId: number): Promise<PRFile[]> {
     const api = await this.api();
 
