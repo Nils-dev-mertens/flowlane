@@ -1,5 +1,6 @@
 import * as p from '@clack/prompts';
 import chalk from 'chalk';
+import { errMsg } from '../utils/errors';
 import { execSync } from 'child_process';
 import { container } from '../container';
 import { TOKENS } from '../tokens';
@@ -460,8 +461,4 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
 
 function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s;
-}
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

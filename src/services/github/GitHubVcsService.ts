@@ -35,6 +35,34 @@ interface GHReview {
   state: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED' | 'DISMISSED' | 'PENDING';
 }
 
+interface GHOpenPRReviewsData {
+  repository?: {
+    pullRequests?: {
+      nodes?: Array<{
+        number: number;
+        reviews?: {
+          nodes?: Array<{ author?: { login?: string } | null; state: GHReview['state'] }>;
+        };
+      }>;
+    };
+  };
+}
+
+const OPEN_PR_REVIEWS_QUERY = `
+  query OpenPRReviews($owner: String!, $name: String!, $first: Int!) {
+    repository(owner: $owner, name: $name) {
+      pullRequests(first: $first, states: OPEN) {
+        nodes {
+          number
+          reviews(last: 100) {
+            nodes { author { login } state }
+          }
+        }
+      }
+    }
+  }
+`;
+
 interface GHReviewComment {
   id: number;
   in_reply_to_id?: number;
@@ -234,14 +262,9 @@ export class GitHubVcsService implements IPRService {
       this.path('/pulls?state=open'),
     );
 
-    // Fetch reviews for each PR concurrently to get the latest vote states.
-    const allReviews = await Promise.all(
-      prs.map((pr) => this.api.getPaginated<GHReview>(
-        this.path(`/pulls/${pr.number}/reviews`),
-      )),
-    );
+    const reviewsByPr = await this.fetchReviewsByPr(prs);
 
-    return prs.map((pr, i) => ({
+    return prs.map((pr) => ({
       id:           pr.number,
       title:        pr.title,
       url:          pr.html_url,
@@ -251,8 +274,49 @@ export class GitHubVcsService implements IPRService {
       authorEmail:  pr.user.login, // GitHub login is the identity — config.user should match
       isDraft:      pr.draft,
       createdAt:    new Date(pr.created_at),
-      reviewers:    this.buildReviewers(pr.requested_reviewers ?? [], allReviews[i] ?? []),
+      reviewers:    this.buildReviewers(pr.requested_reviewers ?? [], reviewsByPr.get(pr.number) ?? []),
     }));
+  }
+
+  /**
+   * Fetch the latest reviews for every open PR. With a token this is a single
+   * GraphQL call (avoiding an N+1 REST fan-out); without one it degrades to
+   * per-PR REST requests, best-effort.
+   */
+  private async fetchReviewsByPr(prs: GHPullRequest[]): Promise<Map<number, GHReview[]>> {
+    const map = new Map<number, GHReview[]>();
+    if (prs.length === 0) return map;
+
+    if (this.api.hasToken) {
+      try {
+        const data = await this.api.graphql<GHOpenPRReviewsData>(OPEN_PR_REVIEWS_QUERY, {
+          owner: this.owner,
+          name:  this.repo,
+          first: Math.min(prs.length, 100),
+        });
+        for (const node of data.repository?.pullRequests?.nodes ?? []) {
+          map.set(node.number, (node.reviews?.nodes ?? [])
+            .filter((r) => r.author?.login)
+            .map((r) => ({
+              id:    0,
+              user:  { login: r.author!.login! },
+              state: r.state,
+            })));
+        }
+        return map;
+      } catch {
+        // GraphQL may be unavailable (Enterprise, permissions) — fall through.
+      }
+    }
+
+    const settled = await Promise.allSettled(
+      prs.map((pr) => this.api.getPaginated<GHReview>(this.path(`/pulls/${pr.number}/reviews`))),
+    );
+    prs.forEach((pr, i) => {
+      const result = settled[i];
+      if (result.status === 'fulfilled') map.set(pr.number, result.value);
+    });
+    return map;
   }
 
   async getPR(prId: number): Promise<PullRequest> {

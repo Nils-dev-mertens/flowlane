@@ -1,5 +1,6 @@
 import * as p from '@clack/prompts';
 import chalk from 'chalk';
+import { errMsg } from '../utils/errors';
 import { container }   from '../container';
 import { TOKENS }      from '../tokens';
 import { isInteractive } from '../utils/tty';
@@ -55,8 +56,4 @@ export async function prReplyThreadCommand(
       process.exit(1);
     }
   }
-}
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

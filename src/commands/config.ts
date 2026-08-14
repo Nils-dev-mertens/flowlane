@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import { errMsg } from '../utils/errors';
 import { container } from '../container';
 import { TOKENS } from '../tokens';
 import type { IConfigService } from '../services/interfaces/IConfigService';
@@ -24,7 +25,7 @@ function parseProviderKey(key: string): { provider: ProviderId; field: string } 
   return { provider: provider as ProviderId, field };
 }
 
-export function configSetCommand(key: string, value: string): void {
+export async function configSetCommand(key: string, value: string): Promise<void> {
   const dotted = parseProviderKey(key);
 
   if (dotted) {
@@ -44,15 +45,14 @@ export function configSetCommand(key: string, value: string): void {
     ? cfg.setProviderField(dotted.provider, dotted.field, value)
     : cfg.set(key as keyof FlowlaneConfig, value);
 
-  write
-    .then(() => {
-      const displayVal = key === 'token' || key.endsWith('.token') ? chalk.dim('***') : value;
-      console.log(`${chalk.green('✓')} Set ${chalk.cyan(key)} = ${displayVal}`);
-    })
-    .catch((err: unknown) => {
-      console.error(chalk.red(`Failed to set config: ${errMsg(err)}`));
-      process.exit(1);
-    });
+  try {
+    await write;
+    const displayVal = key === 'token' || key.endsWith('.token') ? chalk.dim('***') : value;
+    console.log(`${chalk.green('✓')} Set ${chalk.cyan(key)} = ${displayVal}`);
+  } catch (err: unknown) {
+    console.error(chalk.red(`Failed to set config: ${errMsg(err)}`));
+    process.exit(1);
+  }
 }
 
 export function configGetCommand(key: string): void {
@@ -116,8 +116,4 @@ function maskSecrets(obj: Record<string, unknown>): Record<string, unknown> {
     else out[key] = value;
   }
   return out;
-}
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

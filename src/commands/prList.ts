@@ -1,11 +1,13 @@
 import * as p from '@clack/prompts';
 import chalk from 'chalk';
+import { errMsg } from '../utils/errors';
 import { container } from '../container';
 import { TOKENS }    from '../tokens';
 import { isInteractive } from '../utils/tty';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { IPRService }     from '../services/interfaces/IPRService';
 import type { PRSummary }      from '../types';
+import { formatAge, formatReviewers } from '../utils/prDisplay';
 
 export interface PrListOptions {
   /** Output as JSON. */
@@ -111,30 +113,4 @@ function printPR(pr: PRSummary, _context: 'mine' | 'review' | 'other'): void {
   );
   console.log(`           ${branch}`);
   if (votes) console.log(`           ${votes}`);
-}
-
-function formatReviewers(reviewers: PRSummary['reviewers']): string {
-  if (reviewers.length === 0) return '';
-  return reviewers.map(r => {
-    const name = r.name.split(' ')[0]; // first name only
-    if (r.vote === 10)  return chalk.green(`✓ ${name}`);
-    if (r.vote === 5)   return chalk.yellow(`~ ${name}`);
-    if (r.vote === -5)  return chalk.yellow(`⏸ ${name}`);
-    if (r.vote === -10) return chalk.red(`✗ ${name}`);
-    return chalk.dim(`○ ${name}`);
-  }).join(chalk.dim('  ·  '));
-}
-
-function formatAge(date: Date): string {
-  const diff = Date.now() - date.getTime();
-  const mins  = Math.floor(diff / 60_000);
-  const hours = Math.floor(diff / 3_600_000);
-  const days  = Math.floor(diff / 86_400_000);
-  if (days > 0)  return `${days}d ago`;
-  if (hours > 0) return `${hours}h ago`;
-  return `${mins}m ago`;
-}
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

@@ -5,6 +5,11 @@ export interface IConfigService {
 
   /** Read one field from the resolved active config (profile + local overrides). */
   get<T = unknown>(key: keyof FlowlaneConfig): T | undefined;
+  /**
+   * Read a required field from the resolved active config, throwing a clear
+   * error when it is missing instead of returning undefined.
+   */
+  requireConfig<T = unknown>(key: keyof FlowlaneConfig): T;
   /** Read the full resolved active config. */
   getAll(): Partial<FlowlaneConfig>;
   /** Resolve the active ticket provider (`ticketProvider` → `platform` fallback). */

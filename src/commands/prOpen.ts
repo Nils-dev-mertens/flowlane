@@ -1,5 +1,6 @@
 import * as p from '@clack/prompts';
 import chalk from 'chalk';
+import { errMsg } from '../utils/errors';
 import { execSync } from 'child_process';
 import { container } from '../container';
 import { TOKENS }    from '../tokens';
@@ -53,8 +54,4 @@ function openInBrowser(url: string): void {
   } catch {
     // Non-fatal — URL is printed in outro regardless.
   }
-}
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

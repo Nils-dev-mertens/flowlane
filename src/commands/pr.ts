@@ -1,5 +1,7 @@
 import * as p from '@clack/prompts';
 import chalk from 'chalk';
+import { assertConfig } from '../utils/assertConfig';
+import { errMsg } from '../utils/errors';
 import { container } from '../container';
 import { TOKENS } from '../tokens';
 import type { IConfigService } from '../services/interfaces/IConfigService';
@@ -158,16 +160,4 @@ function buildDescription(id: string, title: string, url?: string): string {
   ]
     .filter((l) => l !== undefined)
     .join('\n');
-}
-
-function assertConfig(cfg: IConfigService): void {
-  const { valid, missing } = cfg.validate();
-  if (!valid) {
-    console.error(chalk.red(`Missing config: ${missing.join(', ')}. Run: flowlane init`));
-    process.exit(1);
-  }
-}
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

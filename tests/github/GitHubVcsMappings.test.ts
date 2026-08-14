@@ -225,3 +225,87 @@ test('GitHubVcsService maps changed-file statuses', async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test('GitHubVcsService batches review fetching via GraphQL in listPRs', async () => {
+  let graphqlCalls = 0;
+  let reviewRESTCalls = 0;
+
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    const parsed = new URL(url);
+
+    if (parsed.pathname === '/graphql') {
+      graphqlCalls += 1;
+      void init;
+      return response({
+        data: {
+          repository: {
+            pullRequests: {
+              nodes: [
+                {
+                  number: 1,
+                  reviews: { nodes: [{ author: { login: 'alice' }, state: 'APPROVED' }] },
+                },
+                {
+                  number: 2,
+                  reviews: { nodes: [{ author: { login: 'bob' }, state: 'CHANGES_REQUESTED' }] },
+                },
+              ],
+            },
+          },
+        },
+      });
+    }
+
+    if (parsed.pathname.endsWith('/pulls') && parsed.searchParams.get('state') === 'open') {
+      return response([
+        {
+          number: 1,
+          title: 'PR one',
+          html_url: 'https://github.test/me/demo/pull/1',
+          state: 'open',
+          user: { login: 'me' },
+          head: { ref: 'feature', sha: 'sha' },
+          base: { ref: 'main' },
+          draft: false,
+          created_at: '2026-01-01T00:00:00Z',
+          requested_reviewers: [],
+          body: null,
+        },
+        {
+          number: 2,
+          title: 'PR two',
+          html_url: 'https://github.test/me/demo/pull/2',
+          state: 'open',
+          user: { login: 'me' },
+          head: { ref: 'fix', sha: 'sha' },
+          base: { ref: 'main' },
+          draft: false,
+          created_at: '2026-01-02T00:00:00Z',
+          requested_reviewers: [],
+          body: null,
+        },
+      ]);
+    }
+
+    if (url.includes('/reviews')) {
+      reviewRESTCalls += 1;
+      return response([]);
+    }
+
+    throw new Error(`Unexpected mocked GitHub request: ${url}`);
+  };
+
+  try {
+    const service = new GitHubVcsService(makeConfig());
+    const prs = await service.listPRs();
+
+    assert.equal(prs.length, 2);
+    assert.deepEqual(prs[0].reviewers, [{ name: 'alice', email: 'alice', vote: 10 }]);
+    assert.deepEqual(prs[1].reviewers, [{ name: 'bob', email: 'bob', vote: -10 }]);
+    assert.equal(graphqlCalls, 1);
+    assert.equal(reviewRESTCalls, 0); // no per-PR REST fan-out when authenticated
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

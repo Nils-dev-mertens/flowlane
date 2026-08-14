@@ -1,5 +1,6 @@
 import * as p from '@clack/prompts';
 import chalk from 'chalk';
+import { errMsg } from '../utils/errors';
 import { container } from '../container';
 import { TOKENS }    from '../tokens';
 import type { IConfigService } from '../services/interfaces/IConfigService';
@@ -71,8 +72,4 @@ export async function startCommand(
   );
 
   runHook(cfg.get<string>('hookAfterStart'), { branch: branchName, ticketId });
-}
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

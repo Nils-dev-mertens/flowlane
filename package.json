@@ -30,6 +30,9 @@
     "developer-tools"
   ],
   "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "@clack/prompts": "^0.7.0",
     "azure-devops-node-api": "^12.5.0",

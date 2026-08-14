@@ -10,13 +10,6 @@ import { resolveProviderConfig, resolveTicketProvider, resolveVcsProvider, provi
 import { TICKET_PROVIDERS, VCS_PROVIDERS, getProviderSpec } from '../config/providerRegistry';
 import type { FlowlaneConfig, ProviderId, TicketProvider, VcsProvider } from '../types';
 
-/** Compact provider label, e.g. "github" or "jira + github". */
-export function providerLabel(profile: Partial<FlowlaneConfig>): string {
-  const ticket = profile.ticketProvider ?? profile.platform ?? '?';
-  const vcs    = profile.vcsProvider ?? profile.platform ?? '?';
-  return ticket === vcs ? ticket : `${ticket} + ${vcs}`;
-}
-
 /** Human-readable descriptor for a profile's configured provider(s). */
 export function profileDescriptor(profile: Partial<FlowlaneConfig>): string {
   const ticket = resolveTicketProvider(profile);
@@ -48,7 +41,7 @@ export function profileListCommand(): void {
     const isActive = name === active;
     const marker   = isActive ? chalk.green('●') : chalk.dim('○');
     const label    = isActive ? chalk.green.bold(name) : name;
-    console.log(`  ${marker} ${label}  ${chalk.dim(`${providerLabel(profile)} · ${profileDescriptor(profile)}`)}`);
+    console.log(`  ${marker} ${label}  ${chalk.dim(profileDescriptor(profile))}`);
   }
 
   if (local) {
@@ -101,7 +94,7 @@ export async function profileAddCommand(nameArg?: string): Promise<void> {
     if (detected.project)  fields.push(`project: ${detected.project}`);
     if (detected.repo)     fields.push(`repo: ${detected.repo}`);
     if (detected.baseBranch) fields.push(`baseBranch: ${detected.baseBranch}`);
-    if (detected.user)     fields.push(`user: ${detected.user}`);
+    if (detected.user)     fields.push(`user: ${detected.user} (git email — not a GitHub login)`);
     p.note(fields.join('\n'), 'Auto-detected from git remote');
   }
 

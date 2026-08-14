@@ -32,6 +32,17 @@ export class ConfigService implements IConfigService {
     return this.resolved()[key] as T | undefined;
   }
 
+  requireConfig<T = unknown>(key: keyof FlowlaneConfig): T {
+    const value = this.resolved()[key];
+    if (value === undefined || value === null || value === '') {
+      throw new Error(
+        `Missing required config value "${String(key)}". ` +
+        `Run \`flowlane config set ${String(key)} <value>\` or \`flowlane init\`.`,
+      );
+    }
+    return value as T;
+  }
+
   getAll(): Partial<FlowlaneConfig> {
     return { ...this.resolved() };
   }

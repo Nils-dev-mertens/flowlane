@@ -1,5 +1,7 @@
 import * as p from '@clack/prompts';
 import chalk from 'chalk';
+import { assertConfig } from '../utils/assertConfig';
+import { errMsg } from '../utils/errors';
 import { container } from '../container';
 import { TOKENS } from '../tokens';
 import { offerColumnFix } from '../utils/boardStatusFix';
@@ -116,19 +118,4 @@ export async function reviewCommand(
   }
 
   runHook(cfg.get<string>('hookAfterReview'), { ticketId });
-}
-
-// ── helpers ──────────────────────────────────────────────────────────────────
-
-function assertConfig(cfg: IConfigService): void {
-  const { valid, missing } = cfg.validate();
-  if (!valid) {
-    console.error(chalk.red(`Missing config: ${missing.join(', ')}. Run: flowlane init`));
-    process.exit(1);
-  }
-}
-
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

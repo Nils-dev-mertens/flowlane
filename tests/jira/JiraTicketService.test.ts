@@ -235,6 +235,27 @@ test('JiraTicketService.updateStatus reports available transitions on failure', 
   }
 });
 
+test('JiraTicketService.updateStatus rejects a board column (no such concept)', async () => {
+  let called = false;
+  globalThis.fetch = async () => {
+    called = true;
+    return response({});
+  };
+
+  try {
+    const service = new JiraTicketService(makeConfig());
+    await assert.rejects(
+      service.updateStatus('PRJ-1', 'In Review', 'Code Review'),
+      (err: unknown) =>
+        err instanceof JiraApiError &&
+        err.message.includes('no board-column concept'),
+    );
+    assert.equal(called, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('JiraTicketService surfaces Jira API errors with detail', async () => {
   globalThis.fetch = async () =>
     response({ errorMessages: ['Issue does not exist.'], errors: {} }, 404);

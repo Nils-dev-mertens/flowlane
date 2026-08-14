@@ -1,12 +1,13 @@
 import * as p from '@clack/prompts';
 import chalk from 'chalk';
-import { execSync } from 'child_process';
+import { errMsg } from '../utils/errors';
 import { container }      from '../container';
 import { TOKENS }         from '../tokens';
 import { isInteractive }  from '../utils/tty';
 import type { IPRService } from '../services/interfaces/IPRService';
 import type { PRFile, PRSummary } from '../types';
 import { resolvePRId }    from '../utils/prResolve';
+import { changeTypeBadge, showDiff } from '../utils/prDisplay';
 
 export interface PrFilesOptions {
   json?: boolean;
@@ -135,63 +136,6 @@ function printFileList(files: PRFile[]): void {
   console.log(`\n  ${parts.join(chalk.dim('  ·  '))}\n`);
 }
 
-function changeTypeBadge(type: PRFile['changeType']): string {
-  switch (type) {
-    case 'add':    return chalk.green('+');
-    case 'edit':   return chalk.yellow('~');
-    case 'delete': return chalk.red('-');
-    case 'rename': return chalk.blue('→');
-    default:       return chalk.dim('?');
-  }
-}
-
-function showDiff(file: PRFile, pr?: PRSummary): void {
-  if (file.changeType === 'delete') {
-    console.log(`\n  ${chalk.red('File was deleted.')} No diff to show.\n`);
-    return;
-  }
-
-  // Build git diff args — use PR branch info when available.
-  const target = pr?.targetBranch ?? 'HEAD~1';
-  const source = pr?.sourceBranch ?? 'HEAD';
-
-  let diff: string;
-  try {
-    diff = execSync(
-      `git diff "origin/${target}"..."origin/${source}" -- "${file.path}" 2>/dev/null || ` +
-      `git diff "${target}"..."${source}" -- "${file.path}" 2>/dev/null || ` +
-      `git diff HEAD -- "${file.path}"`,
-      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] },
-    );
-  } catch {
-    diff = '';
-  }
-
-  if (!diff.trim()) {
-    console.log(chalk.dim(`\n  No local diff available for ${file.path}.\n`));
-    return;
-  }
-
-  console.log(`\n  ${chalk.bold(file.path)}`);
-  console.log('  ' + chalk.dim('─'.repeat(60)));
-
-  const lines = diff.split('\n');
-  for (const line of lines) {
-    if (line.startsWith('+++') || line.startsWith('---')) {
-      console.log('  ' + chalk.dim(line));
-    } else if (line.startsWith('+')) {
-      console.log('  ' + chalk.green(line));
-    } else if (line.startsWith('-')) {
-      console.log('  ' + chalk.red(line));
-    } else if (line.startsWith('@@')) {
-      console.log('  ' + chalk.cyan(line));
-    } else {
-      console.log('  ' + line);
-    }
-  }
-  console.log('');
-}
-
 async function postComment(prSvc: IPRService, prId: number, file: PRFile): Promise<void> {
   const text = await p.text({
     message: 'Comment text:',
@@ -226,8 +170,4 @@ async function postComment(prSvc: IPRService, prId: number, file: PRFile): Promi
     spinner.stop(chalk.red('Failed to post comment.'));
     console.error(chalk.red(errMsg(err)));
   }
-}
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

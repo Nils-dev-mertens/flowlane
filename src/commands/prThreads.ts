@@ -1,11 +1,13 @@
 import * as p from '@clack/prompts';
 import chalk from 'chalk';
+import { errMsg } from '../utils/errors';
 import { container }   from '../container';
 import { TOKENS }      from '../tokens';
 import { isInteractive } from '../utils/tty';
 import type { IPRService } from '../services/interfaces/IPRService';
 import type { PRThread }   from '../types';
 import { resolvePRId }     from '../utils/prResolve';
+import { printThread }      from '../utils/prDisplay';
 
 type ThreadAction = 'resolve' | 'reply' | 'none';
 
@@ -94,60 +96,6 @@ export async function prThreadsCommand(prId?: string, options: PrThreadsOptions 
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-function printThread(thread: PRThread, index: number): void {
-  const location = thread.filePath
-    ? chalk.cyan(thread.filePath) + (thread.startLine ? chalk.dim(`:${thread.startLine}`) : '')
-    : chalk.dim('General comment');
-
-  const statusBadge = thread.status === 'pending'
-    ? chalk.yellow(' [pending]')
-    : '';
-
-  console.log(`\n  ${chalk.bold(`Thread #${index}`)}  ·  ${location}${statusBadge}`);
-  console.log('  ' + chalk.dim('─'.repeat(58)));
-
-  thread.comments.forEach((comment, i) => {
-    const isFirst  = i === 0;
-    const age      = formatAge(comment.publishedAt);
-    const author   = isFirst ? chalk.bold(comment.author) : chalk.dim(comment.author);
-    const content  = wrapText(comment.content, 56);
-
-    if (!isFirst) console.log('');
-    console.log(`  ${author}  ${chalk.dim(age)}`);
-    content.forEach(line => console.log(`  ${line}`));
-  });
-}
-
-function wrapText(text: string, width: number): string[] {
-  // Preserve existing newlines, then word-wrap long lines.
-  return text.split('\n').flatMap(line => {
-    if (line.length <= width) return [line];
-    const words: string[] = line.split(' ');
-    const wrapped: string[] = [];
-    let current = '';
-    for (const word of words) {
-      if ((current + ' ' + word).trimStart().length > width) {
-        if (current) wrapped.push(current);
-        current = word;
-      } else {
-        current = current ? `${current} ${word}` : word;
-      }
-    }
-    if (current) wrapped.push(current);
-    return wrapped;
-  });
-}
-
-function formatAge(date: Date): string {
-  const diff  = Date.now() - date.getTime();
-  const mins  = Math.floor(diff / 60_000);
-  const hours = Math.floor(diff / 3_600_000);
-  const days  = Math.floor(diff / 86_400_000);
-  if (days > 0)  return `${days}d ago`;
-  if (hours > 0) return `${hours}h ago`;
-  return `${mins}m ago`;
-}
-
 async function promptThreadAction(
   prSvc: IPRService,
   prId: number,
@@ -205,8 +153,4 @@ async function promptThreadAction(
   } catch (err: unknown) {
     spinner.stop(chalk.red(`Failed: ${errMsg(err)}`));
   }
-}
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

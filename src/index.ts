@@ -8,6 +8,7 @@ import 'reflect-metadata';
 
 import { Command } from 'commander';
 import chalk from 'chalk';
+import { errMsg } from './utils/errors';
 import { execSync } from 'child_process';
 
 import { setupContainer, container } from './container';
@@ -418,9 +419,9 @@ const configCmd = program
 configCmd
   .command('set <key> <value>')
   .description('Persist a config value (e.g. flowlane config set baseBranch develop)')
-  .action((key: string, value: string) => {
+  .action(async (key: string, value: string) => {
     const { configSetCommand } = require('./commands/config') as typeof import('./commands/config');
-    configSetCommand(key, value);
+    await configSetCommand(key, value);
   });
 
 configCmd
@@ -471,9 +472,7 @@ async function ensureConfig(): Promise<void> {
   }
 }
 
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
+
 
 /**
  * Resolves a ticket ID — uses the provided value if given, otherwise

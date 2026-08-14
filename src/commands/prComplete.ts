@@ -1,5 +1,6 @@
 import * as p from '@clack/prompts';
 import chalk from 'chalk';
+import { errMsg } from '../utils/errors';
 import { container }   from '../container';
 import { TOKENS }      from '../tokens';
 import type { IPRService }   from '../services/interfaces/IPRService';
@@ -74,10 +75,4 @@ export async function prCompleteCommand(prId?: string): Promise<void> {
   }
 
   p.outro(chalk.green('Done.'));
-}
-
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

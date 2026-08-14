@@ -66,7 +66,16 @@ export class JiraTicketService implements ITicketService {
     return issues.map((issue) => this.toTicket(issue));
   }
 
-  async updateStatus(id: string, state: string): Promise<void> {
+  async updateStatus(id: string, state: string, boardColumn?: string): Promise<void> {
+    // Jira has no board-column concept — the workflow state IS the transition.
+    // Refuse rather than silently ignore a requested column (capability error).
+    if (boardColumn) {
+      throw new JiraApiError(
+        'Jira has no board-column concept. Set `jira.activeStatus`/`jira.reviewStatus` ' +
+        'to transition names instead of configuring a column.',
+      );
+    }
+
     const transitions = await this.api.request<{ transitions?: JiraTransition[] }>(
       'GET',
       `/issue/${encodeURIComponent(id)}/transitions`,

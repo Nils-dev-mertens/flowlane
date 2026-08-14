@@ -1,12 +1,19 @@
 {
-  "ticketProvider": "azuredevops",
-  "vcsProvider": "azuredevops",
-  "azuredevops": {
-    "org": "my-company",
-    "project": "MyProject",
-    "repo": "MyRepo",
-    "token": "<your-personal-access-token>",
+  "ticketProvider": "jira",
+  "vcsProvider": "github",
+  "jira": {
+    "site": "my-company.atlassian.net",
+    "project": "APP",
+    "token": "<your-atlassian-api-token>",
     "user": "jane.doe@my-company.com",
+    "activeStatus": "In Progress",
+    "reviewStatus": "In Review"
+  },
+  "github": {
+    "owner": "my-company",
+    "repo": "app",
+    "token": "<your-github-personal-access-token>",
+    "user": "janedoe",
     "baseBranch": "main"
   }
 }

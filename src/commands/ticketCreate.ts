@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import { errMsg } from '../utils/errors';
 import { container } from '../container';
 import { TOKENS } from '../tokens';
 import type { ITicketService } from '../services/interfaces/ITicketService';
@@ -55,8 +56,4 @@ export async function ticketCreateCommand(options: TicketCreateOptions): Promise
     }
     process.exit(1);
   }
-}
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }
