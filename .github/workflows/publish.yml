@@ -26,12 +26,28 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Bump patch version
+      - name: Verify npm authentication
+        run: npm whoami --registry=https://registry.npmjs.org
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Prepare release version
+        id: version
+        shell: bash
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          npm version patch -m "chore: bump version to %s [skip ci]"
-          git push
+          current_version=$(node -p "require('./package.json').version")
+          published_version=$(npm view flowlane version --registry=https://registry.npmjs.org 2>/dev/null || true)
+
+          if [ -z "$published_version" ] || [ "$current_version" = "$published_version" ]; then
+            npm version patch --no-git-tag-version
+          else
+            # Recover a version bump that was committed before a previous publish failed.
+            echo "Publishing existing unpublished version $current_version (npm latest is $published_version)."
+          fi
+
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Preparing flowlane@$version"
 
       - name: Build
         run: npm run build
@@ -40,3 +56,15 @@ jobs:
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Persist release version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: bump version to ${{ steps.version.outputs.version }} [skip ci]"
+            git push
+          else
+            echo "Release version was already committed."
+          fi
