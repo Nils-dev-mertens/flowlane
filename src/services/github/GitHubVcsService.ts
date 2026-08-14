@@ -149,6 +149,17 @@ export class GitHubVcsService implements IPRService {
   async createPR(params: CreatePRParams): Promise<PullRequest> {
     const { ticketId, title, description, sourceBranch, targetBranch } = params;
 
+    await this.ensureBranchExists(sourceBranch, 'source');
+    await this.ensureBranchExists(targetBranch, 'base');
+    await this.ensureCommitsToMerge(sourceBranch, targetBranch);
+
+    const existing = await this.findPRForBranch(sourceBranch);
+    if (existing) {
+      throw new GitHubApiError(
+        `An open pull request already exists for branch "${sourceBranch}": #${existing.id} (${existing.url}).`,
+      );
+    }
+
     const body = await this.api.request<{
       number: number;
       title: string;
@@ -438,6 +449,40 @@ export class GitHubVcsService implements IPRService {
 
   private path(suffix: string): string {
     return `/repos/${encodeURIComponent(this.owner)}/${encodeURIComponent(this.repo)}${suffix}`;
+  }
+
+  private async ensureCommitsToMerge(sourceBranch: string, targetBranch: string): Promise<void> {
+    const comparison = await this.api.request<{ ahead_by?: number }>(
+      'GET',
+      this.path(`/compare/${encodeURIComponent(targetBranch)}...${encodeURIComponent(sourceBranch)}`),
+    );
+
+    if ((comparison.ahead_by ?? 0) === 0) {
+      throw new GitHubApiError(
+        `There are no commits on "${sourceBranch}" that are not already in "${targetBranch}". ` +
+        'Create or commit changes on the source branch before opening a pull request.',
+      );
+    }
+  }
+
+  private async ensureBranchExists(branch: string, kind: 'source' | 'base'): Promise<void> {
+    try {
+      await this.api.request(
+        'GET',
+        this.path(`/branches/${encodeURIComponent(branch)}`),
+      );
+    } catch (err: unknown) {
+      if (err instanceof GitHubApiError && err.status === 404) {
+        const guidance = kind === 'source'
+          ? `Push it first with \`git push -u origin ${branch}\`.`
+          : 'Set `baseBranch` to an existing branch in the configuration.';
+        throw new GitHubApiError(
+          `GitHub ${kind} branch "${branch}" was not found in ${this.owner}/${this.repo}. ${guidance}`,
+          { status: 404 },
+        );
+      }
+      throw err;
+    }
   }
 
   private async getReviewThreadMetadata(prId: number): Promise<GHReviewThreadNode[]> {

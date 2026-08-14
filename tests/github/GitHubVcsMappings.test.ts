@@ -97,6 +97,117 @@ test('GitHubVcsService maps general, file, and multi-line comments', async () =>
   }
 });
 
+test('GitHubVcsService validates branches before creating a pull request', async () => {
+  const requests: Array<{ method: string; url: string; body?: unknown }> = [];
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    const body = init?.body === undefined ? undefined : JSON.parse(String(init.body));
+    requests.push({ method, url, body });
+
+    const parsed = new URL(url);
+    if (parsed.pathname.endsWith('/branches/feature')) return response({ name: 'feature' });
+    if (parsed.pathname.endsWith('/branches/main')) return response({ name: 'main' });
+    if (parsed.pathname.endsWith('/compare/main...feature')) return response({ ahead_by: 1 });
+    if (parsed.pathname.endsWith('/pulls') && method === 'GET') return response([]);
+    if (parsed.pathname.endsWith('/pulls') && method === 'POST') {
+      return response({
+        number: 74,
+        title: '[74] Add members table',
+        html_url: 'https://github.test/me/demo/pull/74',
+        state: 'open',
+      });
+    }
+    throw new Error(`Unexpected mocked GitHub request: ${url}`);
+  };
+
+  try {
+    const service = new GitHubVcsService(makeConfig());
+    const pr = await service.createPR({
+      ticketId: '74',
+      title: 'Add members table',
+      sourceBranch: 'feature',
+      targetBranch: 'main',
+    });
+
+    assert.deepEqual(pr, {
+      id: 74,
+      title: '[74] Add members table',
+      url: 'https://github.test/me/demo/pull/74',
+      status: 'open',
+    });
+    assert.equal(requests[0].url, 'https://api.github.com/repos/me/demo/branches/feature');
+    assert.equal(requests[1].url, 'https://api.github.com/repos/me/demo/branches/main');
+    assert.equal(requests[2].url, 'https://api.github.com/repos/me/demo/compare/main...feature');
+    assert.equal(new URL(requests[3].url).searchParams.get('head'), 'me:feature');
+    assert.deepEqual(requests[4].body, {
+      title: '[74] Add members table',
+      body: '',
+      head: 'feature',
+      base: 'main',
+      draft: false,
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('GitHubVcsService reports when the source branch has no commits to merge', async () => {
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    if (url.endsWith('/branches/feature')) return response({ name: 'feature' });
+    if (url.endsWith('/branches/main')) return response({ name: 'main' });
+    if (url.endsWith('/compare/main...feature')) return response({ ahead_by: 0 });
+    throw new Error(`Unexpected mocked GitHub request: ${url}`);
+  };
+
+  try {
+    const service = new GitHubVcsService(makeConfig());
+    await assert.rejects(
+      service.createPR({
+        ticketId: '74',
+        title: 'Add members table',
+        sourceBranch: 'feature',
+        targetBranch: 'main',
+      }),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message.includes('no commits on "feature"') &&
+        error.message.includes('not already in "main"'),
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('GitHubVcsService reports an unpublished source branch before creating a PR', async () => {
+  globalThis.fetch = async (input) => {
+    assert.equal(String(input), 'https://api.github.com/repos/me/demo/branches/feature');
+    return new Response(JSON.stringify({ message: 'Branch not found' }), {
+      status: 404,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  try {
+    const service = new GitHubVcsService(makeConfig());
+    await assert.rejects(
+      service.createPR({
+        ticketId: '74',
+        title: 'Add members table',
+        sourceBranch: 'feature',
+        targetBranch: 'main',
+      }),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message.includes('source branch "feature" was not found') &&
+        error.message.includes('git push -u origin feature'),
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('GitHubVcsService maps changed-file statuses', async () => {
   globalThis.fetch = async (input) => {
     assert.equal(String(input), 'https://api.github.com/repos/me/demo/pulls/42/files?per_page=100&page=1');
