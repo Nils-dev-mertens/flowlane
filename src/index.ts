@@ -51,10 +51,14 @@ program
     await ticketsCommand(opts);
   });
 
-// ── ticket create ─────────────────────────────────────────────────────────────
+// ── ticket ────────────────────────────────────────────────────────────────────
 
-program
-  .command('ticket create')
+const ticketCmd = program
+  .command('ticket')
+  .description('Ticket operations');
+
+ticketCmd
+  .command('create')
   .description('Create a ticket/issue in the configured ticket provider')
   .requiredOption('--title <title>', 'Ticket title')
   .option('--description <text>', 'Ticket description/body')

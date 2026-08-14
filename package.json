@@ -12,12 +12,13 @@
     "LICENSE.md"
   ],
   "scripts": {
-    "build": "rm -rf dist && tsc",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
     "build:watch": "tsc --watch",
     "test": "node --require ts-node/register --test tests/run.ts",
     "dev": "ts-node src/index.ts",
+    "local": "npm run build && npm i -g .",
     "start": "node dist/index.js",
-    "clean": "rm -rf dist",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
