@@ -171,6 +171,20 @@ flowlane pr comment "This whole block should be simplified" \
 
 ---
 
+### `flowlane pr review [prId]`
+
+Interactive review session that stays open across actions. Resolves the PR from an explicit ID, the current branch, or a picker, then shows a compact summary and a repeatable menu: view threads (reply/resolve), review files (view diffs, post inline comments), add a comment, submit a review vote, publish a draft, complete/merge, abandon, or open in the browser.
+
+```bash
+flowlane pr review
+flowlane pr review 42
+flowlane pr review 42 --json    # outputs { pr, threads, files } and exits
+```
+
+The granular `pr threads`, `pr files`, `pr comment`, `pr vote`, `pr approve`, `pr complete`, `pr abandon`, and `pr publish` commands remain available for scripting.
+
+---
+
 ### `flowlane pr list`
 
 Lists active pull requests grouped into yours, waiting for your review, and other.

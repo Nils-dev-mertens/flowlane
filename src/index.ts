@@ -129,6 +129,21 @@ prCmd
   });
 
 prCmd
+  .command('review [prId]')
+  .description('Interactive review session for a pull request (summary, threads, files, review, merge)')
+  .option('--json', 'Output the PR summary, threads, and files as JSON')
+  .action(async (prId?: string, opts: { json?: boolean } = {}) => {
+    await ensureConfig();
+    const { prReviewCommand } = await import('./commands/prReview');
+    try {
+      await prReviewCommand(prId, opts);
+    } catch (err: unknown) {
+      console.error(chalk.red(`Error: ${errMsg(err)}`));
+      process.exit(1);
+    }
+  });
+
+prCmd
   .command('list')
   .description('List active pull requests grouped by yours and waiting for review')
   .option('--json', 'Output PRs as JSON')
