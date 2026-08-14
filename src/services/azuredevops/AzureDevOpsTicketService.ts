@@ -4,9 +4,16 @@ import type { IWorkItemTrackingApi } from 'azure-devops-node-api/WorkItemTrackin
 import type { WorkItem } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
 import type { ITicketService } from '../interfaces/ITicketService';
 import type { IConfigService } from '../interfaces/IConfigService';
-import type { Ticket } from '../../types';
+import type { CreateTicketParams, Ticket, TicketKind } from '../../types';
 import { TOKENS } from '../../tokens';
 import { getAzCliToken } from '../../utils/azCliAuth';
+
+const KIND_TO_WORK_ITEM_TYPE: Record<TicketKind, string> = {
+  issue: 'Issue',
+  task:  'Task',
+  bug:   'Bug',
+  story: 'User Story',
+};
 
 const TICKET_FIELDS = [
   'System.Id',
@@ -25,25 +32,29 @@ const DEFAULT_CLOSED_STATES = ['Done', 'Removed', 'Closed', 'Resolved'];
 @injectable()
 export class AzureDevOpsTicketService implements ITicketService {
   private readonly connection: azdev.WebApi;
+  private readonly org: string;
   private readonly project: string;
+  private readonly team?: string;
   private readonly closedStates: string[];
   private witApi: IWorkItemTrackingApi | null = null;
   /** Cached WEF field name for the board column (e.g. "WEF_xxx_Kanban.Column"). */
   private boardColumnField: string | null | undefined = undefined; // undefined = not yet fetched
 
-  constructor(@inject(TOKENS.ConfigService) private readonly config: IConfigService) {
-    const authMethod = config.get<string>('authMethod') ?? 'pat';
-    const org        = config.get<string>('org')!;
-    this.project     = config.get<string>('project')!;
+  constructor(@inject(TOKENS.ConfigService) config: IConfigService) {
+    const ado        = config.getProviderConfig('azuredevops');
+    const authMethod = ado.authMethod ?? 'pat';
+    const org        = ado.org;
+    this.org         = org;
+    this.project     = ado.project;
+    this.team        = ado.team;
 
-    const closedRaw = config.get<string>('closedStates');
-    this.closedStates = closedRaw
-      ? closedRaw.split(',').map((s) => s.trim()).filter(Boolean)
+    this.closedStates = ado.closedStates
+      ? ado.closedStates.split(',').map((s) => s.trim()).filter(Boolean)
       : DEFAULT_CLOSED_STATES;
 
     const authHandler = authMethod === 'az-cli'
       ? azdev.getBearerHandler(getAzCliToken())
-      : azdev.getPersonalAccessTokenHandler(config.get<string>('token')!);
+      : azdev.getPersonalAccessTokenHandler(ado.token!);
     this.connection = new azdev.WebApi(`https://dev.azure.com/${org}`, authHandler);
   }
   
@@ -134,6 +145,54 @@ export class AzureDevOpsTicketService implements ITicketService {
     }
   }
 
+  async createTicket(params: CreateTicketParams): Promise<Ticket> {
+    const api = await this.api();
+    const project = params.project ?? this.project;
+    const workItemType = KIND_TO_WORK_ITEM_TYPE[params.kind ?? 'task'];
+
+    const patch: { op: string; path: string; value: unknown }[] = [
+      { op: 'add', path: '/fields/System.Title', value: params.title },
+    ];
+    if (params.description) {
+      patch.push({ op: 'add', path: '/fields/System.Description', value: params.description });
+    }
+    if (params.assignee) {
+      patch.push({ op: 'add', path: '/fields/System.AssignedTo', value: params.assignee });
+    }
+    if (params.labels && params.labels.length > 0) {
+      patch.push({ op: 'add', path: '/fields/System.Tags', value: params.labels.join('; ') });
+    }
+    if (params.parentId) {
+      // Link the new work item as a child of the parent via the hierarchy relation.
+      patch.push({
+        op:   'add',
+        path: '/relations/-',
+        value: {
+          rel: 'System.LinkTypes.Hierarchy-Reverse',
+          url: `https://dev.azure.com/${encodeURIComponent(this.org)}/${encodeURIComponent(project)}/_apis/wit/workItems/${encodeURIComponent(params.parentId)}`,
+        },
+      });
+    }
+
+    try {
+      const created = await api.createWorkItem({}, patch, project, workItemType);
+      const fields = created.fields ?? {};
+      const assignee = fields['System.AssignedTo'];
+      return {
+        id:          String(created.id),
+        title:       fields['System.Title'] ?? params.title,
+        status:      fields['System.State'] ?? 'New',
+        type:        workItemType,
+        url:         (created._links as Record<string, { href: string }> | undefined)?.html?.href,
+        assignee:    typeof assignee === 'object' ? assignee?.displayName : assignee,
+        description: params.description,
+        parentId:    params.parentId,
+      };
+    } catch (err: unknown) {
+      throw new Error(extractApiError(err));
+    }
+  }
+
   async updateStatus(id: string, state: string, boardColumn?: string): Promise<void> {
     const api = await this.api();
     const patch: { op: string; path: string; value: string }[] = [
@@ -173,7 +232,7 @@ export class AzureDevOpsTicketService implements ITicketService {
   private async getBoardColumnField(): Promise<string | null> {
     if (this.boardColumnField !== undefined) return this.boardColumnField;
 
-    const team = this.config.get<string>('team');
+    const team = this.team;
     if (!team) {
       this.boardColumnField = null;
       return null;

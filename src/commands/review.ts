@@ -5,6 +5,7 @@ import { TOKENS } from '../tokens';
 import { offerColumnFix } from '../utils/boardStatusFix';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { ITicketService } from '../services/interfaces/ITicketService';
+import type { AzureDevOpsProviderConfig } from '../types';
 import { runHook }             from '../utils/hooks';
 
 export interface ReviewOptions {
@@ -28,8 +29,9 @@ export async function reviewCommand(
 
   // state  = System.State  (e.g. "Active")
   // column = System.BoardColumn (e.g. "Ready for Review") — sub-column under a state
-  const state  = options.status ?? cfg.get<string>('reviewStatus') ?? '';
-  const column = options.status ? undefined : cfg.get<string>('reviewColumn');
+  const adoCfg = cfg.getProviderConfig(cfg.getTicketProvider()) as Partial<AzureDevOpsProviderConfig>;
+  const state  = options.status ?? adoCfg.reviewStatus ?? '';
+  const column = options.status ? undefined : adoCfg.reviewColumn;
 
   // What the user sees on the board
   const displayLabel = column ?? state;
@@ -80,8 +82,8 @@ export async function reviewCommand(
       throw new Error(msg);
     }
 
-    await cfg.set('reviewStatus', fix.state);
-    await cfg.set('reviewColumn', fix.column);
+    await cfg.setProviderField('azuredevops', 'reviewStatus', fix.state);
+    await cfg.setProviderField('azuredevops', 'reviewColumn', fix.column);
     finalLabel = fix.column;
 
     const retrySpinner = p.spinner();

@@ -51,6 +51,24 @@ program
     await ticketsCommand(opts);
   });
 
+// ── ticket create ─────────────────────────────────────────────────────────────
+
+program
+  .command('ticket create')
+  .description('Create a ticket/issue in the configured ticket provider')
+  .requiredOption('--title <title>', 'Ticket title')
+  .option('--description <text>', 'Ticket description/body')
+  .option('--kind <kind>', 'Ticket type: issue, task, bug, or story')
+  .option('--assignee <assignee>', 'Assignee login/email')
+  .option('--labels <labels>', 'Comma-separated labels/tags')
+  .option('--parent <parentId>', 'Parent work item ID (subtask/child link where supported)')
+  .option('--json', 'Output the created ticket as JSON')
+  .action(async (opts: { title: string; description?: string; kind?: string; assignee?: string; labels?: string; parent?: string; json?: boolean }) => {
+    await ensureConfig();
+    const { ticketCreateCommand } = await import('./commands/ticketCreate');
+    await ticketCreateCommand(opts);
+  });
+
 // ── branch ────────────────────────────────────────────────────────────────────
 
 program

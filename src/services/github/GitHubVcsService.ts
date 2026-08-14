@@ -135,12 +135,13 @@ export class GitHubVcsService implements IPRService {
   private readonly api: GitHubApiClient;
 
   constructor(@inject(TOKENS.ConfigService) private readonly config: IConfigService) {
-    this.owner = config.get<string>('org')!;
-    this.repo  = config.get<string>('repo') ?? config.get<string>('project')!;
+    const gh = config.getProviderConfig('github');
+    this.owner = gh.owner;
+    this.repo  = gh.repo;
     this.api   = new GitHubApiClient({
-      token:      config.get<string>('token'),
-      baseUrl:    config.get<string>('baseUrl'),
-      graphqlUrl: config.get<string>('githubGraphqlUrl'),
+      token:      gh.token,
+      baseUrl:    gh.baseUrl,
+      graphqlUrl: gh.graphqlUrl,
     });
   }
 
@@ -281,7 +282,7 @@ export class GitHubVcsService implements IPRService {
   async votePR(prId: number, vote: PRVote): Promise<void> {
     if (vote === 'reset') {
       // Dismiss the user's most recent approvable review.
-      const myLogin = (this.config.get<string>('user') ?? '').toLowerCase();
+      const myLogin = (this.config.getProviderConfig('github').user ?? '').toLowerCase();
       const reviews = await this.api.getPaginated<GHReview>(
         this.path(`/pulls/${prId}/reviews`),
       );

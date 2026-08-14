@@ -39,7 +39,7 @@ export async function prCommand(
   const ticketSvc  = container.resolve<ITicketService>(TOKENS.TicketService);
   const prSvc      = container.resolve<IPRService>(TOKENS.PRService);
   const gitSvc     = container.resolve<IGitService>(TOKENS.GitService);
-  const targetBranch = cfg.get<string>('baseBranch') || 'main';
+  const targetBranch = cfg.getProviderConfig(cfg.getVcsProvider()).baseBranch || 'main';
 
   // ── Resolve source branch ─────────────────────────────────────────────────
 

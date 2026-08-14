@@ -7,17 +7,10 @@ import { GitHubVcsService } from '../../src/services/github/GitHubVcsService';
 const originalFetch = globalThis.fetch;
 
 function makeConfig(): IConfigService {
-  const values = {
-    org: 'me',
-    project: 'demo',
-    repo: 'demo',
-    token: 'test-token',
-    user: 'me',
-  };
-
   return {
-    get<T = unknown>(key: keyof typeof values): T | undefined {
-      return values[key] as T | undefined;
+    getProviderConfig(provider: string) {
+      assert.equal(provider, 'github');
+      return { owner: 'me', repo: 'demo', token: 'test-token', user: 'me' };
     },
   } as IConfigService;
 }

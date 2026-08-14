@@ -58,16 +58,18 @@ npm pack --dry-run
 ```
 src/
 ├── index.ts              Entry point & CLI command definitions
-├── container.ts          tsyringe DI — lazy platform service factories
+├── container.ts          tsyringe DI — lazy ticket + VCS provider factories
 ├── tokens.ts             DI injection tokens
 ├── types/index.ts        Shared types (Ticket, PullRequest, FlowlaneConfig, …)
 ├── config/
-│   └── ConfigService.ts  Multi-profile config — reads/writes config.json
+│   ├── ConfigService.ts       Multi-profile config — reads/writes config.json
+│   ├── providerRegistry.ts    Declarative provider specs (fields, legacy mapping)
+│   └── providers.ts           Pure provider resolution + `platform` fallback
 ├── services/
 │   ├── interfaces/       ITicketService, IPRService, IGitService, IConfigService
 │   ├── azuredevops/      Azure DevOps ticket + PR service implementations
 │   ├── github/           GitHub REST/GraphQL client, issue, and PR services
-│   ├── jira/             Jira stubs (planned)
+│   ├── jira/             Jira REST v3 client and ticket service (ticket-only)
 │   └── git/              GitService — wraps git CLI via child_process
 ├── commands/             One file per CLI command
 └── utils/
@@ -76,7 +78,7 @@ src/
     └── boardStatusFix.ts Interactive recovery when a status update fails
 ```
 
-To add a new platform: implement the interfaces under `src/services/<platform>/` and add a `case` in the two factories in `src/container.ts`. No changes to commands are needed. Provider tests belong under `tests/`, are automatically included by `npm test`, mock `fetch`, and must never contact a live repository.
+Ticketing and VCS/PR providers are resolved independently via `ticketProvider`/`vcsProvider` (with `platform` as a backward-compatible alias). Each provider has a typed, nested config block (`github`, `azuredevops`, `jira`); legacy flat keys are auto-mapped into those blocks on read. The provider registry (`src/config/providerRegistry.ts`) is the single source of truth for wizard prompts, `config set`, and validation. To add a provider, implement the relevant interface under `src/services/<provider>/`, add a registry entry and a `case` in the matching factory in `src/container.ts` — no command changes are needed. See [docs/adding-a-provider.md](./docs/adding-a-provider.md) for the full checklist. Provider tests belong under `tests/`, are automatically included by `npm test`, mock `fetch`, and must never contact a live repository.
 
 ---
 

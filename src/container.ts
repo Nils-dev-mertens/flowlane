@@ -3,8 +3,11 @@
  *
  * Services are registered via lazy factories so the container is valid before
  * the config file exists (e.g. on first run before `flowlane init` completes).
- * The factory reads the platform from the already-saved config at resolution
+ * The factory reads the provider from the already-saved config at resolution
  * time, not at registration time.
+ *
+ * Ticketing and VCS/PR providers are resolved independently so combinations
+ * such as Jira + GitHub are supported without a Jira PR stub.
  */
 import 'reflect-metadata';
 import { container, instanceCachingFactory } from 'tsyringe';
@@ -14,7 +17,6 @@ import { GitService }                   from './services/git/GitService';
 import { AzureDevOpsTicketService }     from './services/azuredevops/AzureDevOpsTicketService';
 import { AzureDevOpsPRService }         from './services/azuredevops/AzureDevOpsPRService';
 import { JiraTicketService }            from './services/jira/JiraTicketService';
-import { JiraPRService }                from './services/jira/JiraPRService';
 import { GitHubTicketService }          from './services/github/GitHubTicketService';
 import { GitHubVcsService }             from './services/github/GitHubVcsService';
 import { TOKENS }                       from './tokens';
@@ -29,55 +31,41 @@ export function setupContainer(): void {
   if (initialised) return;
   initialised = true;
 
-  // ── Config & Git — always available, no platform dependency ───────────────
+  // ── Config & Git — always available, no provider dependency ───────────────
   container.registerSingleton(TOKENS.ConfigService, ConfigService);
   container.registerSingleton(TOKENS.GitService,    GitService);
 
-  // ── Ticket service — resolved lazily based on configured platform ─────────
+  // ── Ticket service — resolved lazily from the configured ticket provider ──
   container.register<ITicketService>(
     TOKENS.TicketService,
     {
       useFactory: instanceCachingFactory((c) => {
-        const cfg      = c.resolve<IConfigService>(TOKENS.ConfigService);
-        const platform = cfg.get<string>('platform');
+        const cfg = c.resolve<IConfigService>(TOKENS.ConfigService);
 
-        switch (platform) {
+        switch (cfg.getTicketProvider()) {
           case 'azuredevops':
             return new AzureDevOpsTicketService(cfg);
           case 'jira':
             return new JiraTicketService(cfg);
           case 'github':
             return new GitHubTicketService(cfg);
-          default:
-            throw new Error(
-              `Unknown platform "${platform ?? '(not set)'}". ` +
-              'Run `flowlane init` to configure.',
-            );
         }
       }),
     },
   );
 
-  // ── PR service — resolved lazily based on configured platform ─────────────
+  // ── PR service — resolved lazily from the configured VCS provider ─────────
   container.register<IPRService>(
     TOKENS.PRService,
     {
       useFactory: instanceCachingFactory((c) => {
-        const cfg      = c.resolve<IConfigService>(TOKENS.ConfigService);
-        const platform = cfg.get<string>('platform');
+        const cfg = c.resolve<IConfigService>(TOKENS.ConfigService);
 
-        switch (platform) {
+        switch (cfg.getVcsProvider()) {
           case 'azuredevops':
             return new AzureDevOpsPRService(cfg);
-          case 'jira':
-            return new JiraPRService(cfg);
           case 'github':
             return new GitHubVcsService(cfg);
-          default:
-            throw new Error(
-              `Unknown platform "${platform ?? '(not set)'}". ` +
-              'Run `flowlane init` to configure.',
-            );
         }
       }),
     },

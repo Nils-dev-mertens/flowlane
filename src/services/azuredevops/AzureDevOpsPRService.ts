@@ -44,22 +44,26 @@ export class AzureDevOpsPRService implements IPRService {
   private readonly project: string;
   private readonly repo: string;
   private readonly org: string;
+  private readonly authMethod: 'pat' | 'az-cli';
+  private readonly token?: string;
   private gitApi: IGitApi | null = null;
   private currentUserId: string | null = null;
 
-  constructor(@inject(TOKENS.ConfigService) private readonly config: IConfigService) {
-    this.org     = config.get<string>('org')!;
-    this.project = config.get<string>('project')!;
+  constructor(@inject(TOKENS.ConfigService) config: IConfigService) {
+    const ado = config.getProviderConfig('azuredevops');
+    this.org        = ado.org;
+    this.project    = ado.project;
     // Fall back to project name when no dedicated repo name is configured.
-    this.repo    = config.get<string>('repo') || this.project;
+    this.repo       = ado.repo || this.project;
+    this.authMethod = ado.authMethod ?? 'pat';
+    this.token      = ado.token;
   }
 
   /** Create a fresh connection with a current token (az-cli tokens expire after ~1 hour). */
   private createConnection(): azdev.WebApi {
-    const authMethod  = this.config.get<string>('authMethod') ?? 'pat';
-    const authHandler = authMethod === 'az-cli'
+    const authHandler = this.authMethod === 'az-cli'
       ? azdev.getBearerHandler(getAzCliToken())
-      : azdev.getPersonalAccessTokenHandler(this.config.get<string>('token')!);
+      : azdev.getPersonalAccessTokenHandler(this.token!);
     return new azdev.WebApi(`https://dev.azure.com/${this.org}`, authHandler);
   }
 

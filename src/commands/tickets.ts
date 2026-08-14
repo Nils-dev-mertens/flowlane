@@ -7,10 +7,11 @@ import { fetchBoardColumns } from '../utils/azureBoard';
 import { getAzCliToken } from '../utils/azCliAuth';
 import { ticketIdFromBranch } from '../utils/branch';
 import { isInteractive } from '../utils/tty';
+import { providerDescriptor } from '../config/providers';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { ITicketService } from '../services/interfaces/ITicketService';
 import type { IGitService } from '../services/interfaces/IGitService';
-import type { Ticket } from '../types';
+import type { AzureDevOpsProviderConfig, Ticket } from '../types';
 
 export interface TicketsOptions {
   user?: string;
@@ -29,7 +30,8 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
 
   if (!isInteractive() || options.json) {
     const ticketSvc = container.resolve<ITicketService>(TOKENS.TicketService);
-    const user      = (options.user ?? cfg.get<string>('user') ?? '').trim();
+    const ticketCfg = cfg.getProviderConfig(cfg.getTicketProvider());
+    const user      = (options.user ?? ticketCfg.user ?? '').trim();
 
     process.stderr.write(`Fetching tickets for ${user}…\n`);
 
@@ -81,15 +83,18 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
 
   // ── Interactive TUI mode ──────────────────────────────────────────────────
 
+  const ticketProvider = cfg.getTicketProvider();
+  const ticketCfg      = cfg.getProviderConfig(ticketProvider);
+
   p.intro(
     chalk.bgCyan.black('  flowlane  ') +
-    chalk.dim(`  ${cfg.get<string>('org')} / ${cfg.get<string>('project')}`),
+    chalk.dim(`  ${providerDescriptor(ticketProvider, ticketCfg)}`),
   );
 
   // ── Fetch tickets ─────────────────────────────────────────────────────────
 
   const ticketSvc = container.resolve<ITicketService>(TOKENS.TicketService);
-  const user      = (options.user ?? cfg.get<string>('user') ?? '').trim();
+  const user      = (options.user ?? ticketCfg.user ?? '').trim();
 
   const spinner = p.spinner();
   spinner.start(`Fetching tickets assigned to ${chalk.cyan(user)}…`);
@@ -252,7 +257,8 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
 
   // ── Action picker ─────────────────────────────────────────────────────────
 
-  const activeLabel = cfg.get<string>('activeColumn') ?? cfg.get<string>('activeStatus');
+  const adoTicket   = ticketCfg as Partial<AzureDevOpsProviderConfig>;
+  const activeLabel = adoTicket.activeColumn ?? adoTicket.activeStatus;
   const startHint   = [
     activeLabel ? `set to ${activeLabel}` : null,
     'create branch',
@@ -294,13 +300,14 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
 
   switch (action) {
     case 'column': {
-      const org        = cfg.get<string>('org')!;
-      const proj       = cfg.get<string>('project')!;
-      const authMethod = (cfg.get<string>('authMethod') ?? 'pat') as 'pat' | 'az-cli';
-      const tok        = authMethod === 'az-cli' ? getAzCliToken() : cfg.get<string>('token')!;
+      const ado        = cfg.getProviderConfig('azuredevops');
+      const org        = ado.org;
+      const proj       = ado.project;
+      const authMethod = (ado.authMethod ?? 'pat') as 'pat' | 'az-cli';
+      const tok        = authMethod === 'az-cli' ? getAzCliToken() : ado.token!;
 
       // Resolve team — use stored value or ask once and save it.
-      let team = cfg.get<string>('team');
+      let team = ado.team;
       if (!team) {
         const teamInput = await p.text({
           message:     'Azure DevOps team name (needed to read the board):',
@@ -309,7 +316,7 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
         }) as string;
         if (p.isCancel(teamInput)) { p.outro('Cancelled.'); break; }
         team = teamInput.trim();
-        await cfg.set('team', team);
+        await cfg.setProviderField('azuredevops', 'team', team);
       }
 
       // Fetch columns.

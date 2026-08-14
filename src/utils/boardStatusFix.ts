@@ -2,7 +2,6 @@ import * as p from '@clack/prompts';
 import chalk from 'chalk';
 import { fetchBoardColumns } from './azureBoard';
 import type { IConfigService } from '../services/interfaces/IConfigService';
-import type { FlowlaneConfig } from '../types';
 
 export interface ColumnFix {
   state:  string;
@@ -22,16 +21,17 @@ export async function offerColumnFix(
   opts: {
     /** Prompt shown in the column picker. */
     message:   string;
-    /** Config key for System.State (e.g. 'activeStatus' | 'reviewStatus'). */
-    stateKey:  keyof FlowlaneConfig;
-    /** Config key for System.BoardColumn (e.g. 'activeColumn' | 'reviewColumn'). */
-    columnKey: keyof FlowlaneConfig;
+    /** Azure DevOps field name for System.State (e.g. 'reviewStatus'). */
+    stateKey:  string;
+    /** Azure DevOps field name for System.BoardColumn (e.g. 'reviewColumn'). */
+    columnKey: string;
   },
 ): Promise<ColumnFix | null> {
-  const org     = cfg.get<string>('org');
-  const project = cfg.get<string>('project');
-  const token   = cfg.get<string>('token');
-  const team    = cfg.get<string>('team');
+  const ado     = cfg.getProviderConfig('azuredevops');
+  const org     = ado.org;
+  const project = ado.project;
+  const token   = ado.token;
+  const team    = ado.team;
 
   let columns: Awaited<ReturnType<typeof fetchBoardColumns>> = [];
   if (org && project && token && team) {
@@ -53,8 +53,8 @@ export async function offerColumnFix(
       p.log.info(`Available columns:\n${lines}`);
     }
     p.log.warn(
-      `Run ${chalk.cyan(`flowlane config set ${String(opts.columnKey)} "<column>"`)} ` +
-      `and ${chalk.cyan(`flowlane config set ${String(opts.stateKey)} "<state>"`)} to fix manually.`,
+      `Run ${chalk.cyan(`flowlane config set azuredevops.${opts.columnKey} "<column>"`)} ` +
+      `and ${chalk.cyan(`flowlane config set azuredevops.${opts.stateKey} "<state>"`)} to fix manually.`,
     );
     return null;
   }

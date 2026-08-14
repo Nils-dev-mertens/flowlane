@@ -1,9 +1,12 @@
 {
-  "platform": "azuredevops",
-  "org": "my-company",
-  "project": "MyProject",
-  "repo": "MyRepo",
-  "token": "<your-personal-access-token>",
-  "user": "jane.doe@my-company.com",
-  "baseBranch": "main"
+  "ticketProvider": "azuredevops",
+  "vcsProvider": "azuredevops",
+  "azuredevops": {
+    "org": "my-company",
+    "project": "MyProject",
+    "repo": "MyRepo",
+    "token": "<your-personal-access-token>",
+    "user": "jane.doe@my-company.com",
+    "baseBranch": "main"
+  }
 }

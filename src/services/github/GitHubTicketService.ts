@@ -1,7 +1,7 @@
 import { injectable, inject } from 'tsyringe';
 import type { ITicketService } from '../interfaces/ITicketService';
 import type { IConfigService } from '../interfaces/IConfigService';
-import type { Ticket } from '../../types';
+import type { CreateTicketParams, Ticket } from '../../types';
 import { TOKENS } from '../../tokens';
 import { GitHubApiClient, GitHubApiError } from './GitHubApiClient';
 
@@ -22,13 +22,14 @@ export class GitHubTicketService implements ITicketService {
   private readonly repo: string;
   private readonly api: GitHubApiClient;
 
-  constructor(@inject(TOKENS.ConfigService) private readonly config: IConfigService) {
-    this.owner = config.get<string>('org')!;
-    this.repo  = config.get<string>('repo') ?? config.get<string>('project')!;
+  constructor(@inject(TOKENS.ConfigService) config: IConfigService) {
+    const gh = config.getProviderConfig('github');
+    this.owner = gh.owner;
+    this.repo  = gh.repo;
     this.api   = new GitHubApiClient({
-      token:      config.get<string>('token'),
-      baseUrl:    config.get<string>('baseUrl'),
-      graphqlUrl: config.get<string>('githubGraphqlUrl'),
+      token:      gh.token,
+      baseUrl:    gh.baseUrl,
+      graphqlUrl: gh.graphqlUrl,
     });
   }
 
@@ -57,6 +58,32 @@ export class GitHubTicketService implements ITicketService {
       this.path(`/issues/${encodeURIComponent(id)}`),
       { state: ghState },
     );
+  }
+
+  async createTicket(params: CreateTicketParams): Promise<Ticket> {
+    if (params.parentId) {
+      throw new GitHubApiError(
+        'GitHub issues have no parent work item. Remove `parentId` or use a project-management tool for hierarchy.',
+      );
+    }
+
+    const labels = [...(params.labels ?? [])];
+    // GitHub has no native issue type; expose `kind` as a leading label so it
+    // maps back to `Ticket.type` and is visible in the issue list.
+    if (params.kind && !labels.includes(params.kind)) labels.unshift(params.kind);
+
+    const issue = await this.api.request<GitHubIssue>(
+      'POST',
+      this.path('/issues'),
+      {
+        title: params.title,
+        body:  params.description ?? '',
+        ...(params.assignee ? { assignee: params.assignee } : {}),
+        ...(labels.length ? { labels } : {}),
+      },
+    );
+
+    return this.toTicket(issue);
   }
 
   private async resolveAssignee(user: string): Promise<string> {

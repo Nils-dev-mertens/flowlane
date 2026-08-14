@@ -3,21 +3,10 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'f
 import { homedir, platform } from 'os';
 import { join, dirname } from 'path';
 import { execFileSync } from 'child_process';
-import type { FlowlaneConfig, LocalRepoConfig, ProfilesFile } from '../types';
+import type { FlowlaneConfig, LocalRepoConfig, ProfilesFile, ProviderBlocks, ProviderId, TicketProvider, VcsProvider } from '../types';
 import type { IConfigService } from '../services/interfaces/IConfigService';
-
-const ALWAYS_REQUIRED: ReadonlyArray<keyof FlowlaneConfig> = [
-  'platform',
-  'org',
-  'project',
-  'user',
-];
-
-/** GitHub can read public resources anonymously; other providers need credentials. */
-function requiredFields(config: Partial<FlowlaneConfig>): ReadonlyArray<keyof FlowlaneConfig> {
-  if (config.authMethod === 'az-cli' || config.platform === 'github') return ALWAYS_REQUIRED;
-  return [...ALWAYS_REQUIRED, 'token'];
-}
+import { resolveProviderConfig, resolveTicketProvider, resolveVcsProvider } from './providers';
+import { getProviderSpec, requiredFields } from './providerRegistry';
 
 const LOCAL_FILENAME = '.flowlane';
 
@@ -47,6 +36,35 @@ export class ConfigService implements IConfigService {
     return { ...this.resolved() };
   }
 
+  getTicketProvider(): TicketProvider {
+    const provider = resolveTicketProvider(this.resolved());
+    if (!provider) {
+      throw new Error(
+        'No ticket provider configured. Run `flowlane init` or set `ticketProvider`/`platform` with `flowlane config set`.',
+      );
+    }
+    return provider;
+  }
+
+  getVcsProvider(): VcsProvider {
+    const provider = resolveVcsProvider(this.resolved());
+    if (!provider) {
+      if (this.resolved().platform === 'jira') {
+        throw new Error(
+          'Jira does not host pull requests. Set `vcsProvider` to `github` or `azuredevops` for PR operations.',
+        );
+      }
+      throw new Error(
+        'No VCS provider configured. Run `flowlane init` or set `vcsProvider`/`platform` with `flowlane config set`.',
+      );
+    }
+    return provider;
+  }
+
+  getProviderConfig<P extends ProviderId>(provider: P): ProviderBlocks[P] {
+    return resolveProviderConfig(this.resolved(), provider);
+  }
+
   async set(key: keyof FlowlaneConfig, value: string): Promise<void> {
     const name = this.getActiveProfileName();
     if (!name) throw new Error('No active profile. Run `flowlane init` first.');
@@ -56,6 +74,18 @@ export class ConfigService implements IConfigService {
     this.resolvedCache = null; // bust resolved cache
   }
 
+  async setProviderField(provider: ProviderId, field: string, value: string): Promise<void> {
+    const name = this.getActiveProfileName();
+    if (!name) throw new Error('No active profile. Run `flowlane init` first.');
+
+    const profile = { ...(this.getProfile(name) ?? {}) } as Record<string, unknown>;
+    const block   = { ...(profile[provider] as Record<string, unknown> | undefined ?? {}) };
+    block[field] = value;
+    profile[provider] = block;
+
+    this.saveProfile(name, profile as Partial<FlowlaneConfig>);
+  }
+
   exists(): boolean {
     if (!existsSync(this.configFilePath)) return false;
     const pf = this.loadProfilesFile();
@@ -63,11 +93,48 @@ export class ConfigService implements IConfigService {
   }
 
   validate(): { valid: boolean; missing: string[] } {
-    if (!this.exists()) return { valid: false, missing: [...ALWAYS_REQUIRED, 'token'] };
-    const config = this.resolved();
-    const fields = requiredFields(config);
-    const missing = fields.filter((f) => !config[f]);
+    if (!this.exists()) {
+      return { valid: false, missing: ['ticketProvider', 'token'] };
+    }
+    const config  = this.resolved();
+    const missing: string[] = [];
+
+    const ticketProvider = resolveTicketProvider(config);
+    if (!ticketProvider) {
+      missing.push('ticketProvider');
+    } else {
+      this.collectProviderMissing(ticketProvider, config, missing);
+    }
+
+    // A VCS provider is optional (only PR commands need one), but when it is
+    // configured its required fields are validated too.
+    const vcsProvider = resolveVcsProvider(config);
+    if (vcsProvider) {
+      this.collectProviderMissing(vcsProvider, config, missing);
+    }
+
     return { valid: missing.length === 0, missing };
+  }
+
+  private collectProviderMissing(
+    provider: ProviderId,
+    config: Partial<FlowlaneConfig>,
+    missing: string[],
+  ): void {
+    const spec  = getProviderSpec(provider);
+    const block = resolveProviderConfig(config, provider) as unknown as Record<string, unknown>;
+
+    for (const key of requiredFields(spec)) {
+      if (!block[key]) missing.push(`${provider}.${key}`);
+    }
+
+    // Token requirement depends on the provider's auth mode. GitHub supports
+    // anonymous public reads; Azure DevOps may use az-cli instead of a PAT.
+    const authMethod = (block.authMethod ?? 'pat') as string;
+    const needsToken =
+      provider === 'jira' ||
+      (provider === 'azuredevops' && authMethod !== 'az-cli');
+    if (needsToken && !block.token) missing.push(`${provider}.token`);
   }
 
   // ── Profile management ────────────────────────────────────────────────────

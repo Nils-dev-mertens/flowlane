@@ -26,31 +26,134 @@ export interface BranchInfo {
   remote?: string;
 }
 
-export interface FlowlaneConfig {
-  platform: 'azuredevops' | 'jira' | 'github';
-  /** How to authenticate. Defaults to 'pat' if omitted. */
-  authMethod?: 'pat' | 'az-cli';
+export type TicketProvider = 'azuredevops' | 'jira' | 'github';
+
+export type VcsProvider = 'github' | 'azuredevops';
+
+/** Any provider id (ticket or VCS). */
+export type ProviderId = TicketProvider | VcsProvider;
+
+/** Fields shared across all provider config blocks. */
+export interface ProviderConfigBase {
+  /** Authentication token / API key. */
+  token?: string;
+  /** Identity used to filter or assign work (login or email). */
+  user?: string;
+  /** Default base branch for pull requests (VCS providers). */
+  baseBranch?: string;
+}
+
+/** GitHub-specific config (owner/repo based). */
+export interface GitHubProviderConfig extends ProviderConfigBase {
+  /** GitHub owner (user or organization). */
+  owner: string;
+  /** Repository name. */
+  repo: string;
+  /** Optional API base URL for GitHub Enterprise. */
+  baseUrl?: string;
+  /** Optional GraphQL URL for GitHub Enterprise. */
+  graphqlUrl?: string;
+}
+
+/** Azure DevOps-specific config (org/project based). */
+export interface AzureDevOpsProviderConfig extends ProviderConfigBase {
   org: string;
   project: string;
   repo?: string;
-  /** Optional for public GitHub reads; required for writes and GraphQL operations. */
-  token?: string;
-  user: string;
-  baseBranch?: string;
-  baseUrl?: string;
-  /** Optional GitHub GraphQL endpoint for Enterprise installations. */
-  githubGraphqlUrl?: string;
+  authMethod?: 'pat' | 'az-cli';
   /** Azure DevOps team name (used to read board columns). */
   team?: string;
-  /** System.State value set when starting work (e.g. "Active"). */
   activeStatus?: string;
-  /** System.BoardColumn value set when starting work (e.g. "Doing"). */
   activeColumn?: string;
-  /** System.State value set when moving to review (e.g. "Active"). */
   reviewStatus?: string;
-  /** System.BoardColumn value set when moving to review (e.g. "Ready for Review"). */
   reviewColumn?: string;
-  /** Comma-separated list of states considered closed/done (excluded from ticket listing). */
+  closedStates?: string;
+}
+
+/** Jira-specific config (site/project-key based). */
+export interface JiraProviderConfig extends ProviderConfigBase {
+  /** Atlassian site subdomain, e.g. "acme.atlassian.net". */
+  site: string;
+  /** Project key, e.g. "PRJ". */
+  project: string;
+}
+
+/** Maps each provider id to its typed config block. */
+export interface ProviderBlocks {
+  github: GitHubProviderConfig;
+  azuredevops: AzureDevOpsProviderConfig;
+  jira: JiraProviderConfig;
+}
+
+/** Provider-neutral ticket type used by `createTicket`. */
+export type TicketKind = 'issue' | 'task' | 'bug' | 'story';
+
+/**
+ * Provider-neutral parameters for creating a ticket/work item.
+ * Providers map these fields to their own capabilities and must report
+ * unsupported fields clearly instead of silently dropping them.
+ */
+export interface CreateTicketParams {
+  title: string;
+  description?: string;
+  kind?: TicketKind;
+  /** Override the configured project/repo (where the provider supports it). */
+  project?: string;
+  /** Parent work item ID, where the provider has a native hierarchy. */
+  parentId?: string;
+  assignee?: string;
+  labels?: string[];
+}
+
+export interface FlowlaneConfig {
+  /** Ticket/work-item provider; falls back to `platform` when omitted. */
+  ticketProvider?: TicketProvider;
+  /** Pull-request/VCS provider; falls back to `platform` when omitted. */
+  vcsProvider?: VcsProvider;
+
+  /** Per-provider config blocks (canonical form). */
+  github?: Partial<GitHubProviderConfig>;
+  azuredevops?: Partial<AzureDevOpsProviderConfig>;
+  jira?: Partial<JiraProviderConfig>;
+
+  // ── Legacy flat fields (deprecated) ───────────────────────────────────────
+  // Auto-mapped into the matching provider block on read so existing configs
+  // keep working. New profiles should use the nested blocks above.
+
+  /**
+   * @deprecated Selects both the ticket and VCS providers at once.
+   * Prefer `ticketProvider` and `vcsProvider`.
+   */
+  platform?: 'azuredevops' | 'jira' | 'github';
+  /** @deprecated Mapped to `github.owner`, `azuredevops.org`, or `jira.site`. */
+  org?: string;
+  /** @deprecated Mapped to `azuredevops.project`, `jira.project`, or GitHub repo. */
+  project?: string;
+  /** @deprecated Mapped to the provider's `repo`. */
+  repo?: string;
+  /** @deprecated Mapped to the provider's `token`. */
+  token?: string;
+  /** @deprecated Mapped to the provider's `user`. */
+  user?: string;
+  /** @deprecated Mapped to the provider's `baseBranch`. */
+  baseBranch?: string;
+  /** @deprecated Mapped to `github.baseUrl`. */
+  baseUrl?: string;
+  /** @deprecated Mapped to `github.graphqlUrl`. */
+  githubGraphqlUrl?: string;
+  /** @deprecated Mapped to `azuredevops.authMethod`. */
+  authMethod?: 'pat' | 'az-cli';
+  /** @deprecated Mapped to `azuredevops.team`. */
+  team?: string;
+  /** @deprecated Mapped to `azuredevops.activeStatus`. */
+  activeStatus?: string;
+  /** @deprecated Mapped to `azuredevops.activeColumn`. */
+  activeColumn?: string;
+  /** @deprecated Mapped to `azuredevops.reviewStatus`. */
+  reviewStatus?: string;
+  /** @deprecated Mapped to `azuredevops.reviewColumn`. */
+  reviewColumn?: string;
+  /** @deprecated Mapped to `azuredevops.closedStates`. */
   closedStates?: string;
   // ── Post-action hooks ──────────────────────────────────────────────────────
   /** Shell command to run after a branch is created. Supports {{branch}}, {{ticketId}}. */

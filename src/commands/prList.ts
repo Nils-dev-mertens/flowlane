@@ -23,7 +23,7 @@ export interface PrListOptions {
 export async function prListCommand(options: PrListOptions = {}): Promise<void> {
   const cfg    = container.resolve<IConfigService>(TOKENS.ConfigService);
   const prSvc  = container.resolve<IPRService>(TOKENS.PRService);
-  const myUser = (cfg.get<string>('user') ?? '').toLowerCase();
+  const myUser = (cfg.getProviderConfig(cfg.getVcsProvider()).user ?? '').toLowerCase();
 
   const interactive = isInteractive() && !options.json;
 

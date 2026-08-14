@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import { container } from '../container';
 import { TOKENS } from '../tokens';
 import { ConfigService } from '../config/ConfigService';
-import { profileAddCommand, profileInitLocalCommand } from './profile';
+import { profileAddCommand, profileInitLocalCommand, profileDescriptor } from './profile';
 
 export async function initCommand(): Promise<void> {
   p.intro(chalk.bgCyan.black('  flowlane init  ') + chalk.dim('  Setup wizard'));
@@ -34,7 +34,7 @@ export async function initCommand(): Promise<void> {
         names.map((n) => {
           const pr  = cfg.getProfile(n)!;
           const dot = n === active ? chalk.green('●') : chalk.dim('○');
-          return `${dot} ${n === active ? chalk.green.bold(n) : n}  ${chalk.dim(`${pr.platform} · ${pr.org} · ${pr.project}`)}`;
+          return `${dot} ${n === active ? chalk.green.bold(n) : n}  ${chalk.dim(profileDescriptor(pr))}`;
         }).join('\n'),
         'Profiles',
       );

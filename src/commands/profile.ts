@@ -6,7 +6,27 @@ import { ConfigService } from '../config/ConfigService';
 import { detectFromGit } from '../utils/gitDetect';
 import { fetchBoardColumns } from '../utils/azureBoard';
 import { getAzCliToken } from '../utils/azCliAuth';
-import type { FlowlaneConfig } from '../types';
+import { resolveProviderConfig, resolveTicketProvider, resolveVcsProvider, providerDescriptor } from '../config/providers';
+import { TICKET_PROVIDERS, VCS_PROVIDERS, getProviderSpec } from '../config/providerRegistry';
+import type { FlowlaneConfig, ProviderId, TicketProvider, VcsProvider } from '../types';
+
+/** Compact provider label, e.g. "github" or "jira + github". */
+export function providerLabel(profile: Partial<FlowlaneConfig>): string {
+  const ticket = profile.ticketProvider ?? profile.platform ?? '?';
+  const vcs    = profile.vcsProvider ?? profile.platform ?? '?';
+  return ticket === vcs ? ticket : `${ticket} + ${vcs}`;
+}
+
+/** Human-readable descriptor for a profile's configured provider(s). */
+export function profileDescriptor(profile: Partial<FlowlaneConfig>): string {
+  const ticket = resolveTicketProvider(profile);
+  const vcs    = resolveVcsProvider(profile);
+
+  const parts: string[] = [];
+  if (ticket) parts.push(providerDescriptor(ticket, resolveProviderConfig(profile, ticket)));
+  if (vcs && vcs !== ticket) parts.push(providerDescriptor(vcs, resolveProviderConfig(profile, vcs)));
+  return parts.join(' + ') || '?';
+}
 
 // ── profile list ──────────────────────────────────────────────────────────────
 
@@ -28,7 +48,7 @@ export function profileListCommand(): void {
     const isActive = name === active;
     const marker   = isActive ? chalk.green('●') : chalk.dim('○');
     const label    = isActive ? chalk.green.bold(name) : name;
-    console.log(`  ${marker} ${label}  ${chalk.dim(`${profile.platform ?? '?'} · ${profile.org ?? '?'} · ${profile.project ?? '?'}`)}`);
+    console.log(`  ${marker} ${label}  ${chalk.dim(`${providerLabel(profile)} · ${profileDescriptor(profile)}`)}`);
   }
 
   if (local) {
@@ -110,314 +130,68 @@ export async function profileAddCommand(nameArg?: string): Promise<void> {
     if (p.isCancel(overwrite) || !overwrite) { p.cancel('Cancelled.'); return; }
   }
 
-  // ── Platform ──────────────────────────────────────────────────────────────
+  // ── Ticket provider ───────────────────────────────────────────────────────
 
-  const platform = await p.select({
-    message: 'Platform:',
-    initialValue: detected.platform ?? 'azuredevops',
+  const ticketProvider = await p.select({
+    message: 'Ticket provider:',
+    options: TICKET_PROVIDERS.map((spec) => ({ value: spec.id, label: spec.label })),
+  }) as string;
+  if (p.isCancel(ticketProvider)) { p.cancel('Cancelled.'); return; }
+
+  // ── VCS / pull-request provider ───────────────────────────────────────────
+
+  const vcsProvider = await p.select({
+    message: 'Pull request (VCS) provider:',
     options: [
-      { value: 'azuredevops', label: 'Azure DevOps', hint: 'dev.azure.com' },
-      { value: 'github',      label: 'GitHub',        hint: 'github.com' },
-      { value: 'jira',        label: 'Jira (stub)',   hint: 'atlassian.net' },
+      { value: 'none', label: 'None', hint: 'tickets only — no pull requests' },
+      ...VCS_PROVIDERS.map((spec) => ({ value: spec.id, label: spec.label })),
     ],
   }) as string;
-  if (p.isCancel(platform)) { p.cancel('Cancelled.'); return; }
+  if (p.isCancel(vcsProvider)) { p.cancel('Cancelled.'); return; }
 
-  // ── Org / Owner ───────────────────────────────────────────────────────────
+  // ── Ask each provider's config fields ─────────────────────────────────────
 
-  const orgLabel =
-    platform === 'azuredevops' ? 'Azure DevOps organization:' :
-    platform === 'github'      ? 'GitHub owner (user or org):' :
-                                 'Jira subdomain:';
+  const providerIds = new Set<ProviderId>([
+    ticketProvider as TicketProvider,
+    ...(vcsProvider !== 'none' ? [vcsProvider as VcsProvider] : []),
+  ]);
 
-  const org = await p.text({
-    message: orgLabel,
-    placeholder: platform === 'github' ? 'my-username' : 'my-company',
-    initialValue: detected.org ?? '',
-    validate: (v) => v.trim() ? undefined : 'Required',
-  }) as string;
-  if (p.isCancel(org)) { p.cancel('Cancelled.'); return; }
-
-  // ── Project / Repo ────────────────────────────────────────────────────────
-
-  let project: string;
-  let repo: string;
-
-  if (platform === 'github') {
-    const repoInput = await p.text({
-      message: 'Repository name:',
-      placeholder: 'my-repo',
-      initialValue: detected.repo ?? '',
-      validate: (v) => v.trim() ? undefined : 'Required',
-    }) as string;
-    if (p.isCancel(repoInput)) { p.cancel('Cancelled.'); return; }
-    repo    = repoInput.trim();
-    project = repo; // project == repo for GitHub
-  } else {
-    const projectInput = await p.text({
-      message: 'Default project name:',
-      placeholder: 'MyProject',
-      initialValue: detected.project ?? '',
-      validate: (v) => v.trim() ? undefined : 'Required',
-    }) as string;
-    if (p.isCancel(projectInput)) { p.cancel('Cancelled.'); return; }
-    project = projectInput.trim();
-
-    const repoInput = await p.text({
-      message: 'Default repository name (leave blank to use project name):',
-      placeholder: project,
-      initialValue: detected.repo ?? '',
-    }) as string;
-    if (p.isCancel(repoInput)) { p.cancel('Cancelled.'); return; }
-    repo = repoInput?.trim() || project;
+  const blocks: Partial<FlowlaneConfig> = {};
+  for (const providerId of providerIds) {
+    const block = await askProviderFields(providerId, detected);
+    if (!block) return; // cancelled
+    (blocks as Record<string, unknown>)[providerId] = block;
   }
 
-  // ── Auth method ───────────────────────────────────────────────────────────
+  // ── Azure DevOps board columns ────────────────────────────────────────────
 
-  let authMethod: 'pat' | 'az-cli' = 'pat';
-  let token = '';
-
-  if (platform === 'azuredevops') {
-    const authChoice = await p.select({
-      message: 'Authentication method:',
-      initialValue: 'pat',
-      options: [
-        { value: 'pat',    label: 'Personal Access Token (PAT)', hint: 'token stored in config' },
-        { value: 'az-cli', label: 'Azure CLI (az login)',        hint: 'no token stored — uses az account get-access-token' },
-      ],
-    }) as string;
-    if (p.isCancel(authChoice)) { p.cancel('Cancelled.'); return; }
-    authMethod = authChoice as 'pat' | 'az-cli';
-  }
-
-  if (authMethod === 'pat') {
-    const tokenRequired = platform !== 'github';
-    const tokenHint =
-      platform === 'azuredevops'
-        ? 'dev.azure.com → User Settings → Personal Access Tokens\nScopes: Work Items R+W, Code R+W, Pull Requests R+W'
-        : platform === 'github'
-        ? 'Optional for public reads. Recommended for the higher rate limit and all writes.\ngithub.com → Settings → Developer settings → Personal access tokens\nFor classic tokens use repo access; fine-grained tokens need access to this repository and issue/pull-request permissions.'
-        : 'id.atlassian.com → Manage profile → Security → API tokens';
-    p.note(tokenHint, 'How to get a token');
-
-    const pat = await p.password({
-      message: platform === 'github'
-        ? 'GitHub token (optional for public reads):'
-        : 'API token / PAT:',
-      validate: (v) => tokenRequired && !v.trim() ? 'Required' : undefined,
-    }) as string;
-    if (p.isCancel(pat)) { p.cancel('Cancelled.'); return; }
-    token = pat.trim();
-  } else {
-    p.note('Make sure you are signed in: az login', 'Azure CLI auth');
-  }
-
-  // ── User ──────────────────────────────────────────────────────────────────
-
-  const userPlaceholder =
-    platform === 'azuredevops' ? 'jane@company.com' :
-    platform === 'github'      ? 'jane' :
-                                 'jane@atlassian.net';
-
-  const detectedGitHubLogin = detected.user &&
-    /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(detected.user)
-    ? detected.user
-    : '';
-  const user = await p.text({
-    message: platform === 'github'
-      ? 'GitHub username/login (not your email):'
-      : 'Your username / email (used to fetch assigned tickets):',
-    placeholder: userPlaceholder,
-    initialValue: platform === 'github' ? detectedGitHubLogin : (detected.user ?? ''),
-    validate: (v) => v.trim() ? undefined : 'Required',
-  }) as string;
-  if (p.isCancel(user)) { p.cancel('Cancelled.'); return; }
-
-  // ── Base branch ───────────────────────────────────────────────────────────
-
-  const baseBranch = await p.text({
-    message: 'Default base branch for pull requests:',
-    placeholder: 'main',
-    initialValue: detected.baseBranch ?? 'main',
-  }) as string;
-  if (p.isCancel(baseBranch)) { p.cancel('Cancelled.'); return; }
-
-  // ── Team name (Azure DevOps only) ─────────────────────────────────────────
-
-  let teamValue = '';
-  let activeStatusValue = '';  // System.State for "in progress"
-  let activeColumnValue = '';  // System.BoardColumn for "in progress"
-  let reviewStatusValue = '';  // System.State for "in review"
-  let reviewColumnValue = '';  // System.BoardColumn for "in review"
-  let closedStatesValue = '';
-
-  if (platform === 'azuredevops') {
-    const defaultTeam = `${project.trim()} Team`;
-    const teamInput = await p.text({
-      message: 'Azure DevOps team name (used to read your board columns):',
-      placeholder: defaultTeam,
-      initialValue: '',
-    }) as string;
-    if (p.isCancel(teamInput)) { p.cancel('Cancelled.'); return; }
-    teamValue = teamInput?.trim() || defaultTeam;
-
-    // ── Fetch board columns ──────────────────────────────────────────────────
-
-    const boardSpinner = p.spinner();
-    boardSpinner.start(`Fetching board columns for "${teamValue}"…`);
-
-    let boardColumns: Awaited<ReturnType<typeof fetchBoardColumns>> | null = null;
-    try {
-      const tokenForBoard = authMethod === 'az-cli' ? getAzCliToken() : token.trim();
-      boardColumns = await fetchBoardColumns(org.trim(), project.trim(), tokenForBoard, teamValue, authMethod);
-      boardSpinner.stop(`Found ${boardColumns.length} board column(s).`);
-    } catch (err: unknown) {
-      boardSpinner.stop(chalk.yellow(`Could not fetch board: ${err instanceof Error ? err.message : String(err)}`));
-      p.log.warn('Falling back to manual input. Update later with `flowlane config set`.');
-    }
-
-    if (boardColumns && boardColumns.length > 0) {
-      // Build a map: column name → unique state values
-      const colStateMap = new Map(boardColumns.map((c) => [c.name, c.states]));
-
-      // ── Pick the "actively working on it" column ──────────────────────────
-
-      const activePick = await p.select({
-        message: 'Which column means you\'re actively working on a ticket?',
-        options: [
-          { value: '', label: 'Skip — don\'t change status when starting work', hint: '' },
-          ...boardColumns.map((col) => ({
-            value: col.name,
-            label: col.name,
-            hint:  col.states.length > 0 ? `state: ${col.states.join(', ')}` : '',
-          })),
-        ],
-      }) as string;
-      if (p.isCancel(activePick)) { p.cancel('Cancelled.'); return; }
-
-      if (activePick) {
-        const activeStates = colStateMap.get(activePick) ?? [];
-        activeColumnValue = activePick;
-        activeStatusValue = activeStates[0] ?? '';
-      }
-
-      // ── Pick the "in review" column ────────────────────────────────────────
-
-      const reviewPick = await p.select({
-        message: 'Which column means "ready for review"?',
-        options: [
-          { value: '', label: 'Skip — don\'t change status when moving to review', hint: '' },
-          ...boardColumns.map((col) => ({
-            value: col.name,
-            label: col.name,
-            hint:  col.states.length > 0 ? `state: ${col.states.join(', ')}` : '',
-          })),
-        ],
-      }) as string;
-      if (p.isCancel(reviewPick)) { p.cancel('Cancelled.'); return; }
-
-      if (reviewPick) {
-        // Store column name (System.BoardColumn) and its underlying state (System.State)
-        const reviewStates = colStateMap.get(reviewPick) ?? [];
-        reviewColumnValue = reviewPick;                // e.g. "Ready for Review"
-        reviewStatusValue = reviewStates[0] ?? '';     // e.g. "Active"
-      }
-
-      // ── Pick the "done / closed" columns ──────────────────────────────────
-
-      const closedPick = await p.multiselect({
-        message: 'Which columns are "done / closed"? (multi-select, Space to toggle)',
-        options: boardColumns.map((col) => ({
-          value: col.name,
-          label: col.name,
-          hint:  col.states.length > 0 ? `state: ${col.states.join(', ')}` : '',
-        })),
-        initialValues: boardColumns.filter((c) => c.isOutgoing).map((c) => c.name),
-        required: false,
-      }) as string[];
-      if (p.isCancel(closedPick)) { p.cancel('Cancelled.'); return; }
-
-      // Flatten all selected column states into a deduplicated comma-separated list
-      const allClosedStates = closedPick
-        .flatMap((colName) => colStateMap.get(colName) ?? [])
-        .filter((v, i, arr) => arr.indexOf(v) === i);
-      closedStatesValue = allClosedStates.join(',');
-
-    } else {
-      // ── Fallback: manual text input ─────────────────────────────────────────
-
-      const activeColumnInput = await p.text({
-        message: 'Board column when you start work (leave blank to skip):',
-        placeholder: 'Doing',
-        initialValue: '',
-      }) as string;
-      if (p.isCancel(activeColumnInput)) { p.cancel('Cancelled.'); return; }
-      activeColumnValue = activeColumnInput?.trim() ?? '';
-
-      const activeStateInput = await p.text({
-        message: activeColumnValue ? 'System.State for that column:' : '',
-        placeholder: 'Active',
-        initialValue: '',
-      }) as string;
-      if (activeColumnValue) {
-        if (p.isCancel(activeStateInput)) { p.cancel('Cancelled.'); return; }
-        activeStatusValue = activeStateInput?.trim() ?? '';
-      }
-
-      const reviewStatusInput = await p.text({
-        message: 'Board column when moving to review (leave blank to skip):',
-        placeholder: 'Ready for Review',
-        initialValue: '',
-      }) as string;
-      if (p.isCancel(reviewStatusInput)) { p.cancel('Cancelled.'); return; }
-      reviewColumnValue = reviewStatusInput?.trim() ?? '';
-
-      const reviewStateInput = await p.text({
-        message: reviewColumnValue ? 'System.State for that column:' : '',
-        placeholder: 'Active',
-        initialValue: '',
-      }) as string;
-      if (reviewColumnValue) {
-        if (p.isCancel(reviewStateInput)) { p.cancel('Cancelled.'); return; }
-        reviewStatusValue = reviewStateInput?.trim() ?? '';
-      }
-
-      const closedStatesInput = await p.text({
-        message: 'Comma-separated closed/done states:',
-        placeholder: 'Done,Removed,Closed,Resolved',
-        initialValue: '',
-      }) as string;
-      if (p.isCancel(closedStatesInput)) { p.cancel('Cancelled.'); return; }
-      closedStatesValue = closedStatesInput?.trim() ?? '';
-    }
+  if (ticketProvider === 'azuredevops') {
+    const adoBlock = blocks.azuredevops as Record<string, unknown> | undefined ?? {};
+    const ok = await askAzureBoardConfig(
+      adoBlock,
+      (adoBlock.org as string) ?? '',
+      (adoBlock.project as string) ?? '',
+      ((adoBlock.authMethod as string | undefined) ?? 'pat') as 'pat' | 'az-cli',
+      (adoBlock.token as string) ?? '',
+    );
+    if (!ok) return;
+    (blocks as Record<string, unknown>).azuredevops = adoBlock;
   }
 
   // ── Persist ───────────────────────────────────────────────────────────────
 
   const profileConfig: Partial<FlowlaneConfig> = {
-    platform:   platform as FlowlaneConfig['platform'],
-    authMethod: authMethod === 'az-cli' ? 'az-cli' : undefined,
-    org:        org.trim(),
-    project:    project.trim(),
-    repo:       repo,
-    ...(token ? { token } : {}),
-    user:       user.trim(),
-    baseBranch: (baseBranch || 'main').trim(),
+    ticketProvider: ticketProvider as TicketProvider,
+    ...(vcsProvider !== 'none' ? { vcsProvider: vcsProvider as VcsProvider } : {}),
+    ...blocks,
   };
-
-  if (teamValue)          profileConfig.team          = teamValue;
-  if (activeColumnValue)  profileConfig.activeColumn  = activeColumnValue;
-  if (activeStatusValue)  profileConfig.activeStatus  = activeStatusValue;
-  if (reviewColumnValue)  profileConfig.reviewColumn  = reviewColumnValue;
-  if (reviewStatusValue)  profileConfig.reviewStatus  = reviewStatusValue;
-  if (closedStatesValue)  profileConfig.closedStates  = closedStatesValue;
 
   cfg.saveProfile(profileName, profileConfig);
   cfg.setActiveProfile(profileName);
 
   p.note(
     Object.entries(profileConfig)
-      .map(([k, v]) => `${chalk.dim(k.padEnd(12))} ${k === 'token' ? chalk.dim('***') : v}`)
+      .map(([k, v]) => `${chalk.dim(k.padEnd(14))} ${formatValue(v)}`)
       .join('\n'),
     `Profile "${profileName}" saved & activated`,
   );
@@ -433,6 +207,233 @@ export async function profileAddCommand(nameArg?: string): Promise<void> {
   }
 
   p.outro(`${chalk.green('✓')} Profile "${profileName}" is now active.`);
+}
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+/** Ask all registry fields for one provider. Returns null when cancelled. */
+async function askProviderFields(
+  provider: ProviderId,
+  detected: ReturnType<typeof detectFromGit>,
+): Promise<Record<string, unknown> | null> {
+  const spec    = getProviderSpec(provider);
+  const initial = initialValues(provider, detected);
+  const block: Record<string, unknown> = {};
+
+  for (const field of spec.fields) {
+    // Azure DevOps skips the token when Azure CLI authentication is selected.
+    if (provider === 'azuredevops' && field.key === 'token' && block.authMethod === 'az-cli') {
+      continue;
+    }
+
+    let value: unknown;
+
+    if (field.options) {
+      value = await p.select({
+        message: field.label,
+        options: [...field.options],
+      });
+    } else if (field.secret) {
+      value = await p.password({
+        message:  field.label,
+        validate: (v) => (field.required && !v.trim() ? 'Required' : undefined),
+      });
+    } else {
+      value = await p.text({
+        message:      field.label,
+        placeholder:  field.placeholder,
+        initialValue: (initial[field.key] as string | undefined) ?? '',
+        validate:     (v) => {
+          if (!field.required) return undefined;
+          return field.validate ? field.validate(v) : (v.trim() ? undefined : 'Required');
+        },
+      });
+    }
+
+    if (p.isCancel(value)) { p.cancel('Cancelled.'); return null; }
+
+    const str = typeof value === 'string' ? value.trim() : String(value);
+    if (str) block[field.key] = str;
+  }
+
+  return block;
+}
+
+/** Map git-detected values onto a provider's field keys. */
+function initialValues(
+  provider: ProviderId,
+  detected: ReturnType<typeof detectFromGit>,
+): Record<string, string | undefined> {
+  const githubLogin = detected.user &&
+    /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(detected.user)
+    ? detected.user
+    : '';
+
+  switch (provider) {
+    case 'github':
+      return {
+        owner:      detected.org,
+        repo:       detected.repo ?? detected.project,
+        user:       githubLogin,
+        baseBranch: detected.baseBranch,
+      };
+    case 'azuredevops':
+      return {
+        org:        detected.org,
+        project:    detected.project,
+        repo:       detected.repo,
+        user:       detected.user,
+        baseBranch: detected.baseBranch,
+      };
+    case 'jira':
+      return {
+        site:    detected.org,
+        project: detected.project,
+        user:    detected.user,
+      };
+  }
+}
+
+/** Ask Azure DevOps board-column questions and populate the ado block. */
+async function askAzureBoardConfig(
+  block: Record<string, unknown>,
+  org: string,
+  project: string,
+  authMethod: 'pat' | 'az-cli',
+  token: string,
+): Promise<boolean> {
+  const defaultTeam = `${project.trim()} Team`;
+  const teamInput = await p.text({
+    message:     'Azure DevOps team name (used to read your board columns):',
+    placeholder: defaultTeam,
+    initialValue: '',
+  }) as string;
+  if (p.isCancel(teamInput)) { p.cancel('Cancelled.'); return false; }
+  block.team = teamInput?.trim() || defaultTeam;
+
+  // ── Fetch board columns ──────────────────────────────────────────────────
+
+  const boardSpinner = p.spinner();
+  boardSpinner.start(`Fetching board columns for "${block.team}"…`);
+
+  let boardColumns: Awaited<ReturnType<typeof fetchBoardColumns>> | null = null;
+  try {
+    const tokenForBoard = authMethod === 'az-cli' ? getAzCliToken() : token;
+    boardColumns = await fetchBoardColumns(org.trim(), project.trim(), tokenForBoard, String(block.team), authMethod);
+    boardSpinner.stop(`Found ${boardColumns.length} board column(s).`);
+  } catch (err: unknown) {
+    boardSpinner.stop(chalk.yellow(`Could not fetch board: ${err instanceof Error ? err.message : String(err)}`));
+    p.log.warn('Falling back to manual input. Update later with `flowlane config set`.');
+  }
+
+  if (boardColumns && boardColumns.length > 0) {
+    const colStateMap = new Map(boardColumns.map((c) => [c.name, c.states]));
+
+    const activePick = await p.select({
+      message: 'Which column means you\'re actively working on a ticket?',
+      options: [
+        { value: '', label: 'Skip — don\'t change status when starting work', hint: '' },
+        ...boardColumns.map((col) => ({
+          value: col.name,
+          label: col.name,
+          hint:  col.states.length > 0 ? `state: ${col.states.join(', ')}` : '',
+        })),
+      ],
+    }) as string;
+    if (p.isCancel(activePick)) { p.cancel('Cancelled.'); return false; }
+
+    if (activePick) {
+      block.activeColumn = activePick;
+      block.activeStatus = (colStateMap.get(activePick) ?? [])[0] ?? '';
+    }
+
+    const reviewPick = await p.select({
+      message: 'Which column means "ready for review"?',
+      options: [
+        { value: '', label: 'Skip — don\'t change status when moving to review', hint: '' },
+        ...boardColumns.map((col) => ({
+          value: col.name,
+          label: col.name,
+          hint:  col.states.length > 0 ? `state: ${col.states.join(', ')}` : '',
+        })),
+      ],
+    }) as string;
+    if (p.isCancel(reviewPick)) { p.cancel('Cancelled.'); return false; }
+
+    if (reviewPick) {
+      block.reviewColumn = reviewPick;
+      block.reviewStatus = (colStateMap.get(reviewPick) ?? [])[0] ?? '';
+    }
+
+    const closedPick = await p.multiselect({
+      message: 'Which columns are "done / closed"? (multi-select, Space to toggle)',
+      options: boardColumns.map((col) => ({
+        value: col.name,
+        label: col.name,
+        hint:  col.states.length > 0 ? `state: ${col.states.join(', ')}` : '',
+      })),
+      initialValues: boardColumns.filter((c) => c.isOutgoing).map((c) => c.name),
+      required: false,
+    }) as string[];
+    if (p.isCancel(closedPick)) { p.cancel('Cancelled.'); return false; }
+
+    const allClosedStates = closedPick
+      .flatMap((colName) => colStateMap.get(colName) ?? [])
+      .filter((v, i, arr) => arr.indexOf(v) === i);
+    if (allClosedStates.length > 0) block.closedStates = allClosedStates.join(',');
+  } else {
+    const activeColumnInput = await p.text({
+      message: 'Board column when you start work (leave blank to skip):',
+      placeholder: 'Doing',
+      initialValue: '',
+    }) as string;
+    if (p.isCancel(activeColumnInput)) { p.cancel('Cancelled.'); return false; }
+    if (activeColumnInput?.trim()) {
+      block.activeColumn = activeColumnInput.trim();
+      const activeStateInput = await p.text({
+        message: 'System.State for that column:',
+        placeholder: 'Active',
+        initialValue: '',
+      }) as string;
+      if (p.isCancel(activeStateInput)) { p.cancel('Cancelled.'); return false; }
+      if (activeStateInput?.trim()) block.activeStatus = activeStateInput.trim();
+    }
+
+    const reviewColumnInput = await p.text({
+      message: 'Board column when moving to review (leave blank to skip):',
+      placeholder: 'Ready for Review',
+      initialValue: '',
+    }) as string;
+    if (p.isCancel(reviewColumnInput)) { p.cancel('Cancelled.'); return false; }
+    if (reviewColumnInput?.trim()) {
+      block.reviewColumn = reviewColumnInput.trim();
+      const reviewStateInput = await p.text({
+        message: 'System.State for that column:',
+        placeholder: 'Active',
+        initialValue: '',
+      }) as string;
+      if (p.isCancel(reviewStateInput)) { p.cancel('Cancelled.'); return false; }
+      if (reviewStateInput?.trim()) block.reviewStatus = reviewStateInput.trim();
+    }
+
+    const closedStatesInput = await p.text({
+      message: 'Comma-separated closed/done states:',
+      placeholder: 'Done,Removed,Closed,Resolved',
+      initialValue: '',
+    }) as string;
+    if (p.isCancel(closedStatesInput)) { p.cancel('Cancelled.'); return false; }
+    if (closedStatesInput?.trim()) block.closedStates = closedStatesInput.trim();
+  }
+
+  return true;
+}
+
+/** Format a config value for the saved-profile note (mask tokens). */
+function formatValue(value: unknown): string {
+  if (typeof value === 'object' && value !== null) {
+    return JSON.stringify(value, (key, v) => (key === 'token' && v ? '***' : v));
+  }
+  return String(value);
 }
 
 // ── profile init-local ────────────────────────────────────────────────────────
@@ -460,7 +461,7 @@ export async function profileInitLocalCommand(): Promise<void> {
     initialValue: defaultProfile,
     options: profiles.map((name) => {
       const pr = cfg.getProfile(name)!;
-      return { value: name, label: name, hint: `${pr.org ?? ''} · ${pr.project ?? ''}` };
+      return { value: name, label: name, hint: profileDescriptor(pr) };
     }),
   }) as string;
   if (p.isCancel(chosenProfile)) { p.cancel('Cancelled.'); return; }

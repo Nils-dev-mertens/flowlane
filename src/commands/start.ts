@@ -4,6 +4,7 @@ import { container } from '../container';
 import { TOKENS }    from '../tokens';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { ITicketService } from '../services/interfaces/ITicketService';
+import type { AzureDevOpsProviderConfig } from '../types';
 import { branchCommand } from './branch';
 import { runHook }       from '../utils/hooks';
 
@@ -32,8 +33,9 @@ export async function startCommand(
 
   const cfg          = container.resolve<IConfigService>(TOKENS.ConfigService);
   const ticketSvc    = container.resolve<ITicketService>(TOKENS.TicketService);
-  const activeState  = cfg.get<string>('activeStatus') ?? 'Active';
-  const activeColumn = cfg.get<string>('activeColumn');
+  const adoCfg       = cfg.getProviderConfig(cfg.getTicketProvider()) as Partial<AzureDevOpsProviderConfig>;
+  const activeState  = adoCfg.activeStatus ?? 'Active';
+  const activeColumn = adoCfg.activeColumn;
 
   try {
     await ticketSvc.updateStatus(ticketId, activeState, activeColumn);

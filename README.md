@@ -80,6 +80,35 @@ When stdout is not a TTY (piped, redirected, or `CI=true`), the TUI is skipped a
 
 ---
 
+### `flowlane ticket create`
+
+Creates a ticket/issue in the configured ticket provider. For GitHub it creates an issue; for Azure DevOps it creates the corresponding work item type.
+
+```bash
+flowlane ticket create --title "Fix login rate limit"
+flowlane ticket create --title "Fix login rate limit" --kind bug --labels backend,security
+flowlane ticket create --title "Add members table" --description "A sortable members table" --assignee jane --kind task --json
+flowlane ticket create --title "Handle retries" --parent PRJ-5
+```
+
+| Option | Description |
+|--------|-------------|
+| `--title <title>` | Ticket title (required) |
+| `--description <text>` | Ticket description/body |
+| `--kind <kind>` | `issue`, `task`, `bug`, or `story` |
+| `--assignee <assignee>` | Assignee login/email |
+| `--labels <labels>` | Comma-separated labels/tags |
+| `--parent <parentId>` | Parent work item (subtask/child link where supported) |
+| `--json` | Output the created ticket as JSON |
+
+Provider notes:
+
+- **GitHub**: `kind` is stored as a leading label (GitHub has no native issue type); `parentId` is unsupported.
+- **Azure DevOps**: `kind` maps to a work item type (`task`→Task, `bug`→Bug, `story`→User Story, `issue`→Issue); labels map to tags; `parentId` links the new work item as a child via a hierarchy relation.
+- **Jira**: `kind` maps to an issue type (`task`→Task, `bug`→Bug, `story`→Story, `issue`→Task); descriptions become ADF; `parentId` creates a subtask under the parent key.
+
+---
+
 ### `flowlane start <ticketId>`
 
 Full workflow in one command:
@@ -301,21 +330,48 @@ Global config is stored at `~/.config/flowlane/config.json` and supports multipl
 
 ### Core settings
 
+Each provider is configured in its own nested block. `ticketProvider` and `vcsProvider` select which blocks are active; `platform` is a legacy alias that sets both at once.
+
+**`github`**
+
 | Key | Required | Description |
 |-----|----------|-------------|
-| `platform` | ✓ | `azuredevops`, `github`, or `jira` (Jira operations are still planned) |
-| `org` | ✓ | Azure DevOps organisation name |
-| `project` | ✓ | Project name |
-| `token` | Conditional | Required for Azure DevOps/Jira and GitHub writes/GraphQL; optional for public GitHub reads |
-| `user` | ✓ | Your provider identity used to filter assigned tickets; for GitHub this must be your username/login, not an email |
-| `authMethod` | — | `pat` (default) or `az-cli` — how to authenticate |
-| `repo` | — | Git repository name. Defaults to `project` |
-| `baseBranch` | — | PR target branch. Defaults to `main` |
-| `baseUrl` | — | Self-hosted Azure DevOps URL or GitHub REST API base URL |
-| `githubGraphqlUrl` | — | Optional GitHub GraphQL endpoint for Enterprise installations |
-| `team` | — | Azure DevOps team name. Required for board column operations |
+| `owner` | ✓ | GitHub owner (user or organization) |
+| `repo` | ✓ | Repository name |
+| `user` | ✓ | GitHub username/login (not an email) |
+| `token` | — | Optional for public reads; required for writes and GraphQL |
+| `baseBranch` | — | PR target branch (default `main`) |
+| `baseUrl` / `graphqlUrl` | — | GitHub Enterprise REST/GraphQL endpoints |
 
-### Workflow status mapping
+**`azuredevops`**
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `org` | ✓ | Organization name |
+| `project` | ✓ | Project name |
+| `user` | ✓ | Email used to filter assigned tickets |
+| `token` | Conditional | PAT; not needed with `authMethod: az-cli` |
+| `authMethod` | — | `pat` (default) or `az-cli` |
+| `repo` | — | Repository name (defaults to project) |
+| `baseBranch` | — | PR target branch (default `main`) |
+| `team` | — | Team name for board column operations |
+
+**`jira`**
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `site` | ✓ | Atlassian site subdomain (e.g. `acme.atlassian.net`) |
+| `project` | ✓ | Project key (e.g. `PRJ`) |
+| `user` | ✓ | Account email |
+| `token` | ✓ | Atlassian API token |
+
+### Legacy flat keys
+
+The flat keys from earlier versions — `org`, `project`, `repo`, `token`, `user`, `baseBranch`, `authMethod`, `team`, `activeStatus`, `activeColumn`, `reviewStatus`, `reviewColumn`, `closedStates`, `baseUrl`, `githubGraphqlUrl` — still work and are auto-mapped into the matching provider block on read.
+
+### Azure DevOps workflow status mapping
+
+These live under the `azuredevops` block (or use the legacy flat keys, which auto-map):
 
 | Key | Description |
 |-----|-------------|
@@ -362,23 +418,57 @@ flowlane config set hookAfterPR ""
   "activeProfile": "work",
   "profiles": {
     "work": {
-      "platform": "azuredevops",
-      "org": "my-company",
-      "project": "MyProject",
-      "repo": "MyRepo",
-      "token": "<pat>",
-      "user": "jane.doe@my-company.com",
-      "baseBranch": "main",
-      "team": "MyProject Team",
-      "activeStatus": "Active",
-      "activeColumn": "Doing",
-      "reviewStatus": "Active",
-      "reviewColumn": "Ready for Review",
+      "ticketProvider": "azuredevops",
+      "vcsProvider": "azuredevops",
+      "azuredevops": {
+        "org": "my-company",
+        "project": "MyProject",
+        "repo": "MyRepo",
+        "token": "<pat>",
+        "user": "jane.doe@my-company.com",
+        "baseBranch": "main",
+        "team": "MyProject Team",
+        "activeStatus": "Active",
+        "activeColumn": "Doing",
+        "reviewStatus": "Active",
+        "reviewColumn": "Ready for Review"
+      },
       "hookAfterPR": "open {{prUrl}}"
     }
   }
 }
 ```
+
+### Mixed providers (e.g. Jira + GitHub)
+
+Ticketing and PR providers can be configured independently. `platform` remains a backward-compatible alias that sets both at once.
+
+```json
+{
+  "activeProfile": "hybrid",
+  "profiles": {
+    "hybrid": {
+      "ticketProvider": "jira",
+      "vcsProvider": "github",
+      "jira": {
+        "site": "acme.atlassian.net",
+        "project": "PRJ",
+        "token": "<atlassian-token>",
+        "user": "jane@acme.com"
+      },
+      "github": {
+        "owner": "acme",
+        "repo": "web",
+        "token": "<github-token>",
+        "user": "janedoe",
+        "baseBranch": "main"
+      }
+    }
+  }
+}
+```
+
+> Jira is a ticket-only provider (it does not host pull requests), so `vcsProvider` must point at GitHub or Azure DevOps. Jira ticket operations (read, list, transition, create) are fully implemented against the Jira Cloud REST v3 API.
 
 ### `.flowlane` — repo-level override
 

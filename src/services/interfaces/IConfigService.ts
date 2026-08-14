@@ -1,4 +1,4 @@
-import type { FlowlaneConfig, ProfilesFile } from '../../types';
+import type { FlowlaneConfig, ProfilesFile, ProviderBlocks, ProviderId, TicketProvider, VcsProvider } from '../../types';
 
 export interface IConfigService {
   // ── Active-profile access (used by all commands) ──────────────────────────
@@ -7,8 +7,19 @@ export interface IConfigService {
   get<T = unknown>(key: keyof FlowlaneConfig): T | undefined;
   /** Read the full resolved active config. */
   getAll(): Partial<FlowlaneConfig>;
+  /** Resolve the active ticket provider (`ticketProvider` → `platform` fallback). */
+  getTicketProvider(): TicketProvider;
+  /** Resolve the active VCS/PR provider (`vcsProvider` → `platform` fallback). */
+  getVcsProvider(): VcsProvider;
+  /**
+   * Resolve a provider's effective config block (nested block over legacy
+   * flat fields). This is the canonical way providers read their settings.
+   */
+  getProviderConfig<P extends ProviderId>(provider: P): ProviderBlocks[P];
   /** Persist a single key → value into the active profile. */
   set(key: keyof FlowlaneConfig, value: string): Promise<void>;
+  /** Persist a field into a provider's nested config block. */
+  setProviderField(provider: ProviderId, field: string, value: string): Promise<void>;
 
   /** Returns true when the profiles file exists and has at least one profile. */
   exists(): boolean;
