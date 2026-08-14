@@ -35,7 +35,7 @@ flowlane --version
 flowlane init
 ```
 
-The interactive wizard asks for your platform, organisation, project, token, and user identity, then saves everything to `~/.config/flowlane/config.json`. For GitHub, the token may be left blank for public read-only access; flowlane uses the anonymous rate limit until a token is configured.
+The interactive wizard asks for your platform, organisation, project, token, and user identity, then saves everything to `~/.config/flowlane/config.json`. For GitHub, enter your GitHub username/login—not your email address. The token may be left blank for public read-only access; flowlane uses the anonymous rate limit until a token is configured.
 
 For per-repository overrides (e.g. a different profile or base branch):
 
@@ -307,7 +307,7 @@ Global config is stored at `~/.config/flowlane/config.json` and supports multipl
 | `org` | ✓ | Azure DevOps organisation name |
 | `project` | ✓ | Project name |
 | `token` | Conditional | Required for Azure DevOps/Jira and GitHub writes/GraphQL; optional for public GitHub reads |
-| `user` | ✓ | Your email or display name — used to filter assigned tickets |
+| `user` | ✓ | Your provider identity used to filter assigned tickets; for GitHub this must be your username/login, not an email |
 | `authMethod` | — | `pat` (default) or `az-cli` — how to authenticate |
 | `repo` | — | Git repository name. Defaults to `project` |
 | `baseBranch` | — | PR target branch. Defaults to `main` |

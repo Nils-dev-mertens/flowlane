@@ -109,3 +109,45 @@ test('GitHubTicketService maps closed status to GitHub issue state', async () =>
     globalThis.fetch = originalFetch;
   }
 });
+
+test('GitHubTicketService resolves a configured git email to the authenticated GitHub login', async () => {
+  const requests: string[] = [];
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    requests.push(url);
+
+    if (url === 'https://api.github.com/user') {
+      return response({ login: 'me' });
+    }
+    if (new URL(url).pathname.endsWith('/issues')) {
+      assert.equal(new URL(url).searchParams.get('assignee'), 'me');
+      return response([]);
+    }
+    throw new Error(`Unexpected mocked GitHub request: ${url}`);
+  };
+
+  try {
+    const values = {
+      org: 'me',
+      project: 'demo',
+      repo: 'demo',
+      token: 'test-token',
+      user: 'me@example.com',
+    };
+    const config = {
+      get<T = unknown>(key: keyof typeof values): T | undefined {
+        return values[key] as T | undefined;
+      },
+    } as IConfigService;
+
+    const service = new GitHubTicketService(config);
+    await service.getTicketsForUser(values.user);
+
+    assert.deepEqual(requests, [
+      'https://api.github.com/user',
+      'https://api.github.com/repos/me/demo/issues?state=open&assignee=me&per_page=100&page=1',
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

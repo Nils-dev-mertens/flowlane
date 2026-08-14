@@ -71,3 +71,27 @@ test('GitHubApiClient rejects invalid JSON responses', async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test('GitHubApiClient includes GitHub validation details in API errors', async () => {
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    message: 'Validation Failed',
+    errors: [{ resource: 'Issue', field: 'assignee', code: 'invalid', value: 'me@example.com' }],
+  }), {
+    status: 422,
+    headers: { 'content-type': 'application/json' },
+  });
+
+  try {
+    const client = new GitHubApiClient({ token: 'test-token' });
+    await assert.rejects(
+      client.request('GET', '/issues'),
+      (error: unknown) =>
+        error instanceof GitHubApiError &&
+        error.message.includes('Validation Failed') &&
+        error.message.includes('assignee') &&
+        error.status === 422,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

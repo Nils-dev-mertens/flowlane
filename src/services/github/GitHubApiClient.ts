@@ -226,7 +226,12 @@ export class GitHubApiClient {
     const body = parsed && typeof parsed === 'object'
       ? parsed as { message?: string; errors?: unknown[] }
       : undefined;
-    const detail = body?.message ?? (body?.errors ? ` ${JSON.stringify(body.errors)}` : '');
+    const detail = [
+      body?.message,
+      body?.errors && body.errors.length > 0 ? JSON.stringify(body.errors) : undefined,
+    ]
+      .filter(Boolean)
+      .join('. ');
     const rateRemaining = response.headers.get('x-ratelimit-remaining');
     const rateReset = response.headers.get('x-ratelimit-reset');
     const retryAfter = response.headers.get('retry-after');

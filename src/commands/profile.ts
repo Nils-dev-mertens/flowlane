@@ -219,10 +219,16 @@ export async function profileAddCommand(nameArg?: string): Promise<void> {
     platform === 'github'      ? 'jane' :
                                  'jane@atlassian.net';
 
+  const detectedGitHubLogin = detected.user &&
+    /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(detected.user)
+    ? detected.user
+    : '';
   const user = await p.text({
-    message: 'Your username / email (used to fetch assigned tickets):',
+    message: platform === 'github'
+      ? 'GitHub username/login (not your email):'
+      : 'Your username / email (used to fetch assigned tickets):',
     placeholder: userPlaceholder,
-    initialValue: detected.user ?? '',
+    initialValue: platform === 'github' ? detectedGitHubLogin : (detected.user ?? ''),
     validate: (v) => v.trim() ? undefined : 'Required',
   }) as string;
   if (p.isCancel(user)) { p.cancel('Cancelled.'); return; }

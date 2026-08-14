@@ -3,7 +3,7 @@ import type { ITicketService } from '../interfaces/ITicketService';
 import type { IConfigService } from '../interfaces/IConfigService';
 import type { Ticket } from '../../types';
 import { TOKENS } from '../../tokens';
-import { GitHubApiClient } from './GitHubApiClient';
+import { GitHubApiClient, GitHubApiError } from './GitHubApiClient';
 
 interface GitHubIssue {
   number: number;
@@ -41,8 +41,9 @@ export class GitHubTicketService implements ITicketService {
   }
 
   async getTicketsForUser(user: string): Promise<Ticket[]> {
+    const assignee = await this.resolveAssignee(user);
     const issues = await this.api.getPaginated<GitHubIssue>(
-      this.path(`/issues?state=open&assignee=${encodeURIComponent(user)}`),
+      this.path(`/issues?state=open&assignee=${encodeURIComponent(assignee)}`),
     );
     // Exclude pull requests (GitHub returns them in /issues).
     return issues.filter((issue) => !issue.pull_request).map((issue) => this.toTicket(issue));
@@ -56,6 +57,31 @@ export class GitHubTicketService implements ITicketService {
       this.path(`/issues/${encodeURIComponent(id)}`),
       { state: ghState },
     );
+  }
+
+  private async resolveAssignee(user: string): Promise<string> {
+    const configuredUser = user.trim();
+
+    // GitHub's assignee query accepts a login, not an email address or display name.
+    if (/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(configuredUser)) {
+      return configuredUser;
+    }
+
+    if (!this.api.hasToken) {
+      throw new GitHubApiError(
+        `GitHub ticket filtering requires a GitHub username, but the configured user ` +
+        `"${configuredUser}" is not a valid login. Run ` +
+        '`flowlane config set user <github-username>` or add a token so flowlane can resolve the authenticated user.',
+      );
+    }
+
+    const currentUser = await this.api.request<{ login?: string }>('GET', '/user');
+    if (!currentUser.login) {
+      throw new GitHubApiError(
+        'GitHub did not return a login for the authenticated user. Run `flowlane config set user <github-username>`.',
+      );
+    }
+    return currentUser.login;
   }
 
   private path(suffix: string): string {
