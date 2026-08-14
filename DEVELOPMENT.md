@@ -82,8 +82,10 @@ To add a new platform: implement the interfaces under `src/services/<platform>/`
 
 ## Publishing
 
-Publishing to npm is handled automatically by the GitHub Actions workflow on every push to `main`. The workflow verifies the `NPM_TOKEN` GitHub secret with `npm whoami`, builds, publishes, and only then persists the version bump. If a previous publish failed after its version bump was pushed, the workflow reuses that unpublished version instead of incrementing again.
+Publishing to npm is handled automatically by the GitHub Actions workflow on every push to `main`. The workflow authenticates with the `NPM_TOKEN` GitHub secret, verifies npm access, runs all tests and the build, publishes only when those steps pass, and only then persists the version bump. If a previous publish failed after its version bump was pushed, the workflow reuses that unpublished version instead of incrementing again.
 
-`NPM_TOKEN` must belong to an npm account that owns or can publish the `flowlane` package and must have publish/write permission. A missing, expired, or unauthorized token commonly appears as an npm `E404` during `PUT /flowlane`; check the `Verify npm authentication` step first.
+Create a **granular npm access token** with read/write access to the `flowlane` package and enable 2FA bypass if npm requires it for automation publishing. Store the token in the GitHub repository under **Settings → Secrets and variables → Actions → New repository secret** with the exact name `NPM_TOKEN`. Never commit the token or print it in logs. The workflow passes it through `NODE_AUTH_TOKEN` only to npm commands.
+
+If tests fail, the publish step is never reached. The version commit and push also happen only after npm publish succeeds.
 
 If you need to bump a minor or major version, update `package.json` manually before merging to `main`.
