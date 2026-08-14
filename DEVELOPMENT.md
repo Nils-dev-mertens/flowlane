@@ -82,6 +82,17 @@ Ticketing and VCS/PR providers are resolved independently via `ticketProvider`/`
 
 ---
 
+## Continuous integration
+
+Two workflows make up CI:
+
+- `.github/workflows/test.yml` — runs `npm ci`, `npm run build`, and `npm test` on **pull requests only** (all branches).
+- `.github/workflows/publish.yml` — runs on push to `main` and is its own gate: it runs `npm ci`, `npm test`, and `npm run build` before `npm publish`, so nothing is published unless tests and the build pass. The version bump is committed only after a successful publish.
+
+Because `test.yml` is PR-only, direct pushes to `main` are covered by `publish.yml`'s inline test+build rather than a separate run. Configure the `Test / test` check as required branch protection so PRs cannot merge untested.
+
+---
+
 ## Publishing
 
 Publishing to npm is handled automatically by the GitHub Actions workflow on every push to `main`. The workflow authenticates with the `NPM_TOKEN` GitHub secret, verifies npm access, runs all tests and the build, publishes only when those steps pass, and only then persists the version bump. If a previous publish failed after its version bump was pushed, the workflow reuses that unpublished version instead of incrementing again.

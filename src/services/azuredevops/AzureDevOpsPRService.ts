@@ -15,6 +15,7 @@ import type {
 } from '../../types';
 import { TOKENS } from '../../tokens';
 import { getAzCliToken } from '../../utils/azCliAuth';
+import { mapChangeType, mapThreadStatus } from './mappers';
 
 // Azure DevOps numeric constants (avoid importing const enums at runtime)
 const PR_STATUS_ACTIVE    = 1;
@@ -132,16 +133,6 @@ export class AzureDevOpsPRService implements IPRService {
     }
 
     await api.createThread(thread, this.repo, Number(prId), this.project);
-  }
-
-  async linkWorkItem(prId: string | number, ticketId: string): Promise<void> {
-    const api = await this.api();
-    await api.updatePullRequest(
-      { workItemRefs: [{ id: String(ticketId), url: '' }] },
-      this.repo,
-      Number(prId),
-      this.project,
-    );
   }
 
   // ── New PR management methods ─────────────────────────────────────────────
@@ -316,26 +307,5 @@ export class AzureDevOpsPRService implements IPRService {
 
   private prUrl(id: number): string {
     return `https://dev.azure.com/${this.org}/${this.project}/_git/${this.repo}/pullrequest/${id}`;
-  }
-}
-
-function mapChangeType(changeType: number): PRFile['changeType'] {
-  // VersionControlChangeType flags: 1=add, 2=edit, 4=delete, 8=rename, 16=undelete, 32=branch
-  if (changeType & 4)  return 'delete';
-  if (changeType & 8)  return 'rename';
-  if (changeType & 1)  return 'add';
-  if (changeType & 2)  return 'edit';
-  return 'other';
-}
-
-function mapThreadStatus(status?: number): PRThread['status'] {
-  switch (status) {
-    case 1: return 'active';
-    case 2:
-    case 3:
-    case 5: return 'resolved';
-    case 4: return 'closed';
-    case 6: return 'pending';
-    default: return 'other';
   }
 }

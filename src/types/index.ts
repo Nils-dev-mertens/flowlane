@@ -76,6 +76,10 @@ export interface JiraProviderConfig extends ProviderConfigBase {
   site: string;
   /** Project key, e.g. "PRJ". */
   project: string;
+  /** Transition target name used by `flowlane start`, e.g. "In Progress". */
+  activeStatus?: string;
+  /** Transition target name used by `flowlane review`, e.g. "In Review". */
+  reviewStatus?: string;
 }
 
 /** Maps each provider id to its typed config block. */
@@ -200,6 +204,11 @@ export interface PRThread {
   id: number;
   /** Optional opaque provider thread ID (for APIs such as GitHub GraphQL). */
   providerId?: string;
+  /**
+   * Provenance of the thread. Inline code-review threads are `review`;
+   * flat comments on the PR/issue timeline are `issue`. Used to route replies.
+   */
+  kind?: 'review' | 'issue';
   status: 'active' | 'resolved' | 'pending' | 'closed' | 'other';
   /** File path for inline threads. Undefined for general comments. */
   filePath?: string;

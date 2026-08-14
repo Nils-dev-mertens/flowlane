@@ -57,11 +57,14 @@ export async function prReviewCommand(prId?: string, options: PrReviewOptions = 
   const summary = await loadSummary(prSvc, id, interactive);
 
   if (options.json) {
-    const [threads, files] = await Promise.all([
-      prSvc.getThreads(id).catch(() => [] as PRThread[]),
-      prSvc.getChangedFiles(id).catch(() => [] as PRFile[]),
-    ]);
-    process.stdout.write(JSON.stringify({ pr: summary, threads, files }, null, 2) + '\n');
+    const [threads, threadsError] = await settle(prSvc.getThreads(id));
+    const [files, filesError]     = await settle(prSvc.getChangedFiles(id));
+    process.stdout.write(JSON.stringify({
+      pr: summary,
+      threads,
+      files,
+      ...(threadsError || filesError ? { errors: { threads: threadsError, files: filesError } } : {}),
+    }, null, 2) + '\n');
     return;
   }
 
@@ -616,4 +619,13 @@ function showDiff(file: PRFile, pr?: PRSummary): void {
 
 function errMsg(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+/** Resolve a promise into `[value, errorMessage]` so JSON mode can report failures. */
+async function settle<T>(promise: Promise<T>): Promise<[T | undefined, string | undefined]> {
+  try {
+    return [await promise, undefined];
+  } catch (err: unknown) {
+    return [undefined, errMsg(err)];
+  }
 }

@@ -5,7 +5,7 @@ import { TOKENS } from '../tokens';
 import { offerColumnFix } from '../utils/boardStatusFix';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { ITicketService } from '../services/interfaces/ITicketService';
-import type { AzureDevOpsProviderConfig } from '../types';
+import { workflowTarget } from '../utils/workflowTarget';
 import { runHook }             from '../utils/hooks';
 
 export interface ReviewOptions {
@@ -27,20 +27,28 @@ export async function reviewCommand(
   const cfg = container.resolve<IConfigService>(TOKENS.ConfigService);
   assertConfig(cfg);
 
-  // state  = System.State  (e.g. "Active")
-  // column = System.BoardColumn (e.g. "Ready for Review") — sub-column under a state
-  const adoCfg = cfg.getProviderConfig(cfg.getTicketProvider()) as Partial<AzureDevOpsProviderConfig>;
-  const state  = options.status ?? adoCfg.reviewStatus ?? '';
-  const column = options.status ? undefined : adoCfg.reviewColumn;
+  const provider = cfg.getTicketProvider();
+
+  // state  = System.State (ADO) / transition name (Jira)
+  // column = System.BoardColumn (Azure DevOps only)
+  const target = options.status
+    ? { state: options.status, column: undefined }
+    : workflowTarget(provider, cfg.getAll(), 'review');
+
+  if (!target) {
+    throw new Error(
+      `${provider} tickets have no "review" status. ` +
+      (provider === 'azuredevops'
+        ? 'Run: flowlane config set azuredevops.reviewStatus "<state>"'
+        : 'GitHub issues only support open/closed; add a label or use --status to close.'),
+    );
+  }
+
+  const state  = target.state ?? '';
+  const column = target.column;
 
   // What the user sees on the board
   const displayLabel = column ?? state;
-
-  if (!state) {
-    throw new Error(
-      'No review status configured. Run: flowlane config set reviewStatus "<state>"',
-    );
-  }
 
   if (!interactive) {
     p.intro(chalk.bgCyan.black('  flowlane review  ') + chalk.dim(`  Ticket ${ticketId}`));
@@ -71,7 +79,11 @@ export async function reviewCommand(
     const msg = errMsg(err);
     spinner.stop(chalk.red(`Failed: ${msg}`));
 
-    // Offer an interactive fix — pick the correct column and retry.
+    // The interactive column fix is Azure DevOps-specific (board columns).
+    if (provider !== 'azuredevops') {
+      throw new Error(msg);
+    }
+
     const fix = await offerColumnFix(cfg, {
       message:   'Which column should "in review" map to?',
       stateKey:  'reviewStatus',

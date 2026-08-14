@@ -2,6 +2,7 @@ import * as p from '@clack/prompts';
 import chalk from 'chalk';
 import { execSync } from 'child_process';
 import type { IPRService } from '../services/interfaces/IPRService';
+import { isInteractive } from './tty';
 
 /**
  * Resolve a numeric PR ID.
@@ -28,15 +29,20 @@ export async function resolvePRId(
     throw new Error('Not inside a git repository.');
   }
 
-  const spinner = p.spinner();
-  spinner.start(`Finding PR for branch "${chalk.cyan(branch)}"…`);
+  // Only animate progress on a real terminal; scripts/JSON get plain output.
+  const interactive = isInteractive();
+  const spinner = interactive ? p.spinner() : null;
+  spinner?.start(`Finding PR for branch "${chalk.cyan(branch)}"…`);
+  if (!interactive) process.stderr.write(`Finding PR for branch "${branch}"…\n`);
 
   const pr = await prSvc.findPRForBranch(branch);
   if (!pr) {
-    spinner.stop(chalk.red(`No open PR found for branch "${branch}".`));
-    throw new Error(`No open PR found for branch "${branch}".`);
+    const message = `No open PR found for branch "${branch}".`;
+    spinner?.stop(chalk.red(message));
+    throw new Error(message);
   }
 
-  spinner.stop(`PR #${chalk.cyan(pr.id)} — ${chalk.dim(pr.title)}`);
+  spinner?.stop(`PR #${chalk.cyan(pr.id)} — ${chalk.dim(pr.title)}`);
+  if (!interactive) process.stderr.write(`PR #${pr.id} — ${pr.title}\n`);
   return Number(pr.id);
 }

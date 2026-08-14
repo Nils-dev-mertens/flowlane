@@ -142,3 +142,71 @@ test('GitHubVcsService resolves an inline thread through GraphQL', async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test('GitHubVcsService replies to an issue comment via the issue-comments endpoint', async () => {
+  const posts: Array<{ url: string; body: unknown }> = [];
+
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    const path = new URL(url).pathname;
+
+    if (path === '/graphql') {
+      return response({ data: { repository: { pullRequest: { reviewThreads: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } } } } } });
+    }
+    if (method === 'POST' && path.endsWith('/comments')) {
+      posts.push({ url, body: JSON.parse(String(init?.body)) });
+      return response({});
+    }
+    if (path.endsWith('/pulls/42/comments')) return response([]);
+    if (path.endsWith('/issues/42/comments')) {
+      return response([{ id: 99, user: { login: 'reviewer' }, body: 'Nice work', created_at: '2026-08-14T10:00:00Z' }]);
+    }
+    throw new Error(`Unexpected mocked GitHub request: ${url}`);
+  };
+
+  try {
+    const service = new GitHubVcsService(makeConfig());
+    await service.replyToThread(42, 99, 'Thanks!');
+
+    assert.equal(posts.length, 1);
+    assert.ok(posts[0].url.includes('/issues/42/comments'));
+    assert.deepEqual(posts[0].body, { body: 'Thanks!' });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('GitHubVcsService replies to an inline thread via the review-comments endpoint', async () => {
+  const posts: Array<{ url: string; body: unknown }> = [];
+
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    const path = new URL(url).pathname;
+
+    if (path === '/graphql') {
+      return response({ data: { repository: { pullRequest: { reviewThreads: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } } } } } });
+    }
+    if (method === 'POST' && path.endsWith('/comments')) {
+      posts.push({ url, body: JSON.parse(String(init?.body)) });
+      return response({});
+    }
+    if (path.endsWith('/pulls/42/comments')) {
+      return response([{ id: 11, user: { login: 'reviewer' }, body: 'Simplify', path: 'src/new.ts', line: 8, original_line: 8, created_at: '2026-08-14T10:00:00Z' }]);
+    }
+    if (path.endsWith('/issues/42/comments')) return response([]);
+    throw new Error(`Unexpected mocked GitHub request: ${url}`);
+  };
+
+  try {
+    const service = new GitHubVcsService(makeConfig());
+    await service.replyToThread(42, 11, 'Will do');
+
+    assert.equal(posts.length, 1);
+    assert.ok(posts[0].url.includes('/pulls/42/comments'));
+    assert.deepEqual(posts[0].body, { body: 'Will do', in_reply_to: 11 });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

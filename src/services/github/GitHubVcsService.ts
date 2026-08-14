@@ -227,22 +227,6 @@ export class GitHubVcsService implements IPRService {
     }
   }
 
-  async linkWorkItem(prId: string | number, ticketId: string): Promise<void> {
-    // GitHub has no native work-item links — append the reference to the PR body.
-    const pr = await this.api.request<{ body: string | null }>(
-      'GET',
-      this.path(`/pulls/${prId}`),
-    );
-
-    const existing = pr.body ?? '';
-    const ref      = `\n\n---\nLinked ticket: ${ticketId}`;
-    if (existing.includes(ref)) return;
-
-    await this.api.request('PATCH', this.path(`/pulls/${prId}`), {
-      body: existing + ref,
-    });
-  }
-
   // ── PR management ─────────────────────────────────────────────────────────
 
   async listPRs(): Promise<PRSummary[]> {
@@ -379,6 +363,7 @@ export class GitHubVcsService implements IPRService {
       threads.push({
         id:         root.id,
         providerId: metadata?.id,
+        kind:       'review',
         status,
         filePath:   root.path || metadata?.path || undefined,
         startLine:  root.line ?? root.original_line ?? metadata?.startLine ?? metadata?.line ?? undefined,
@@ -394,6 +379,7 @@ export class GitHubVcsService implements IPRService {
     for (const comment of issueComments.filter((candidate) => !candidate.isDeleted)) {
       threads.push({
         id:      comment.id,
+        kind:    'issue',
         status:  'active',
         comments: [{
           author:      comment.user?.login ?? 'Unknown',
@@ -419,7 +405,7 @@ export class GitHubVcsService implements IPRService {
     if (!thread) {
       throw new Error(`Thread #${threadId} was not found on PR #${prId}.`);
     }
-    if (!thread.providerId) {
+    if (thread.kind !== 'review' || !thread.providerId) {
       throw new Error('Only inline GitHub review threads can be resolved; general comments cannot be resolved.');
     }
     if (thread.status === 'resolved') return;
@@ -428,6 +414,15 @@ export class GitHubVcsService implements IPRService {
   }
 
   async replyToThread(prId: number, threadId: number, comment: string): Promise<void> {
+    // Issue comments are flat (GitHub does not thread them) — a reply is a new
+    // general comment, not an in_reply_to against the review-comment endpoint.
+    const thread = (await this.getThreads(prId, false)).find((candidate) => candidate.id === threadId);
+
+    if (thread?.kind === 'issue') {
+      await this.api.request('POST', this.path(`/issues/${prId}/comments`), { body: comment });
+      return;
+    }
+
     await this.api.request('POST', this.path(`/pulls/${prId}/comments`), {
       body:        comment,
       in_reply_to: threadId,

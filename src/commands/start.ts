@@ -4,7 +4,7 @@ import { container } from '../container';
 import { TOKENS }    from '../tokens';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { ITicketService } from '../services/interfaces/ITicketService';
-import type { AzureDevOpsProviderConfig } from '../types';
+import { workflowTarget } from '../utils/workflowTarget';
 import { branchCommand } from './branch';
 import { runHook }       from '../utils/hooks';
 
@@ -31,18 +31,23 @@ export async function startCommand(
 
   // ── Step 0: set ticket state + board column to active ────────────────────
 
-  const cfg          = container.resolve<IConfigService>(TOKENS.ConfigService);
-  const ticketSvc    = container.resolve<ITicketService>(TOKENS.TicketService);
-  const adoCfg       = cfg.getProviderConfig(cfg.getTicketProvider()) as Partial<AzureDevOpsProviderConfig>;
-  const activeState  = adoCfg.activeStatus ?? 'Active';
-  const activeColumn = adoCfg.activeColumn;
+  const cfg       = container.resolve<IConfigService>(TOKENS.ConfigService);
+  const ticketSvc = container.resolve<ITicketService>(TOKENS.TicketService);
+  const target    = workflowTarget(cfg.getTicketProvider(), cfg.getAll(), 'start');
 
-  try {
-    await ticketSvc.updateStatus(ticketId, activeState, activeColumn);
-    const label = activeColumn ?? activeState;
-    p.log.success(`Ticket moved to "${chalk.yellow(label)}".`);
-  } catch (err: unknown) {
-    p.log.warn(`Could not update ticket state: ${errMsg(err)}`);
+  if (!target) {
+    p.log.warn(`${cfg.getTicketProvider()} tickets have no "start" status — skipping status update.`);
+  } else {
+    const state  = target.state ?? '';
+    const column = target.column;
+    const label  = column ?? state;
+
+    try {
+      await ticketSvc.updateStatus(ticketId, state, column);
+      p.log.success(`Ticket moved to "${chalk.yellow(label)}".`);
+    } catch (err: unknown) {
+      p.log.warn(`Could not update ticket state: ${errMsg(err)}`);
+    }
   }
 
   // ── Step 1: branch ────────────────────────────────────────────────────────

@@ -119,6 +119,8 @@ export const PROVIDER_SPECS: Record<ProviderId, ProviderSpec> = {
         secret: true,
         hint: 'id.atlassian.com → Manage profile → Security → API tokens',
       },
+      { key: 'activeStatus', label: 'Status when starting work (transition name)', placeholder: 'In Progress' },
+      { key: 'reviewStatus', label: 'Status when ready for review (transition name)', placeholder: 'In Review' },
     ],
     fromLegacy: (flat) => ({
       site:    flat.org,

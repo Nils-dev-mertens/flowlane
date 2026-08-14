@@ -8,10 +8,11 @@ import { getAzCliToken } from '../utils/azCliAuth';
 import { ticketIdFromBranch } from '../utils/branch';
 import { isInteractive } from '../utils/tty';
 import { providerDescriptor } from '../config/providers';
+import { workflowTarget } from '../utils/workflowTarget';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { ITicketService } from '../services/interfaces/ITicketService';
 import type { IGitService } from '../services/interfaces/IGitService';
-import type { AzureDevOpsProviderConfig, Ticket } from '../types';
+import type { Ticket } from '../types';
 
 export interface TicketsOptions {
   user?: string;
@@ -257,10 +258,10 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
 
   // ── Action picker ─────────────────────────────────────────────────────────
 
-  const adoTicket   = ticketCfg as Partial<AzureDevOpsProviderConfig>;
-  const activeLabel = adoTicket.activeColumn ?? adoTicket.activeStatus;
+  const startTarget = workflowTarget(ticketProvider, cfg.getAll(), 'start');
+  const startLabel  = startTarget ? (startTarget.column ?? startTarget.state) : null;
   const startHint   = [
-    activeLabel ? `set to ${activeLabel}` : null,
+    startLabel ? `set to ${startLabel}` : null,
     'create branch',
     'push',
   ].filter(Boolean).join(' → ');
@@ -276,16 +277,24 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
     ? existingBranches.join(', ')
     : 'no local branches found for this ticket';
 
+  const actionOptions: Array<{ value: string; label: string; hint?: string }> = [
+    { value: 'start',      label: chalk.bold('Full workflow'), hint: startHint },
+    { value: 'branch',     label: 'Create & push branch' },
+    { value: 'switch',     label: 'Switch to branch',         hint: switchHint },
+    { value: 'pr',         label: 'Create pull request' },
+    { value: 'pr-comment', label: 'Add comment to PR',       hint: 'post a comment on the open PR for the current branch' },
+  ];
+
+  // Board-column movement only exists for Azure DevOps.
+  if (ticketProvider === 'azuredevops') {
+    actionOptions.unshift(
+      { value: 'column', label: 'Change column / status', hint: 'move ticket to any column on the board' },
+    );
+  }
+
   const action = await p.select({
     message: 'What would you like to do?',
-    options: [
-      { value: 'column',     label: 'Change column / status',  hint: 'move ticket to any column on the board' },
-      { value: 'start',      label: chalk.bold('Full workflow'), hint: startHint },
-      { value: 'branch',     label: 'Create & push branch' },
-      { value: 'switch',     label: 'Switch to branch',         hint: switchHint },
-      { value: 'pr',         label: 'Create pull request' },
-      { value: 'pr-comment', label: 'Add comment to PR',       hint: 'post a comment on the open PR for the current branch' },
-    ],
+    options: actionOptions,
   });
 
   if (p.isCancel(action)) { p.outro('Cancelled.'); return; }
