@@ -75,7 +75,8 @@ const prCmd = program
 
 prCmd
   .argument('[ticketId]', 'Ticket ID to link (defaults to current branch ticket)')
-  .action(async (ticketId?: string) => {
+  .option('--draft', 'Create the pull request as a draft (non-interactive mode)')
+  .action(async (ticketId?: string, opts: { draft?: boolean } = {}) => {
     await ensureConfig();
     const id = resolveTicketId(ticketId);
     if (!id) {
@@ -85,7 +86,7 @@ prCmd
     }
     const { prCommand } = await import('./commands/pr');
     try {
-      await prCommand(id);
+      await prCommand(id, { draft: opts.draft });
     } catch (err: unknown) {
       console.error(chalk.red(`Error: ${errMsg(err)}`));
       process.exit(1);

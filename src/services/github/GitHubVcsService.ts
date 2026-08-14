@@ -11,6 +11,7 @@ import type {
   CreatePRParams,
 } from '../../types';
 import { TOKENS } from '../../tokens';
+import { GitHubApiClient, GitHubApiError } from './GitHubApiClient';
 
 // ── GitHub API shapes ─────────────────────────────────────────────────────────
 
@@ -37,8 +38,9 @@ interface GHReview {
 interface GHReviewComment {
   id: number;
   in_reply_to_id?: number;
-  user: { login: string };
+  user?: { login: string } | null;
   body: string;
+  isDeleted?: boolean;
   path: string;
   line: number | null;
   original_line: number | null;
@@ -47,8 +49,9 @@ interface GHReviewComment {
 
 interface GHIssueComment {
   id: number;
-  user: { login: string };
+  user?: { login: string } | null;
   body: string;
+  isDeleted?: boolean;
   created_at: string;
 }
 
@@ -58,19 +61,87 @@ interface GHPullFile {
   previous_filename?: string;
 }
 
+interface GHReviewThreadNode {
+  id: string;
+  isResolved: boolean;
+  path: string | null;
+  line: number | null;
+  startLine: number | null;
+  comments: {
+    nodes: Array<{ databaseId: number | null }>;
+  };
+}
+
+interface GHReviewThreadConnection {
+  nodes: GHReviewThreadNode[];
+  pageInfo: {
+    hasNextPage: boolean;
+    endCursor: string | null;
+  };
+}
+
+interface GHReviewThreadsData {
+  repository: {
+    pullRequest: {
+      reviewThreads: GHReviewThreadConnection;
+    } | null;
+  } | null;
+}
+
+const REVIEW_THREADS_QUERY = `
+  query ReviewThreads($owner: String!, $repo: String!, $number: Int!, $after: String) {
+    repository(owner: $owner, name: $repo) {
+      pullRequest(number: $number) {
+        reviewThreads(first: 100, after: $after) {
+          nodes {
+            id
+            isResolved
+            path
+            line
+            startLine
+            comments(first: 1) {
+              nodes {
+                databaseId
+              }
+            }
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
+      }
+    }
+  }
+`;
+
+const RESOLVE_REVIEW_THREAD_MUTATION = `
+  mutation ResolveReviewThread($threadId: ID!) {
+    resolveReviewThread(input: { threadId: $threadId }) {
+      thread {
+        id
+        isResolved
+      }
+    }
+  }
+`;
+
 // ── Service ───────────────────────────────────────────────────────────────────
 
 @injectable()
 export class GitHubVcsService implements IPRService {
   private readonly owner: string;
   private readonly repo: string;
-  private readonly token: string;
-  private readonly baseUrl = 'https://api.github.com';
+  private readonly api: GitHubApiClient;
 
   constructor(@inject(TOKENS.ConfigService) private readonly config: IConfigService) {
     this.owner = config.get<string>('org')!;
     this.repo  = config.get<string>('repo') ?? config.get<string>('project')!;
-    this.token = config.get<string>('token')!;
+    this.api   = new GitHubApiClient({
+      token:      config.get<string>('token'),
+      baseUrl:    config.get<string>('baseUrl'),
+      graphqlUrl: config.get<string>('githubGraphqlUrl'),
+    });
   }
 
   // ── Core PR operations ────────────────────────────────────────────────────
@@ -78,12 +149,12 @@ export class GitHubVcsService implements IPRService {
   async createPR(params: CreatePRParams): Promise<PullRequest> {
     const { ticketId, title, description, sourceBranch, targetBranch } = params;
 
-    const body = await this.request<{
+    const body = await this.api.request<{
       number: number;
       title: string;
       html_url: string;
       state: string;
-    }>('POST', `/repos/${this.owner}/${this.repo}/pulls`, {
+    }>('POST', this.path('/pulls'), {
       title: ticketId ? `[${ticketId}] ${title}` : title,
       body:  description ?? '',
       head:  sourceBranch,
@@ -95,12 +166,12 @@ export class GitHubVcsService implements IPRService {
   }
 
   async findPRForBranch(branch: string): Promise<PullRequest | null> {
-    const prs = await this.request<Array<{
+    const prs = await this.api.getPaginated<{
       number: number;
       title: string;
       html_url: string;
       state: string;
-    }>>('GET', `/repos/${this.owner}/${this.repo}/pulls?state=open&head=${this.owner}:${branch}`);
+    }>(this.path(`/pulls?state=open&head=${encodeURIComponent(`${this.owner}:${branch}`)}`));
 
     const pr = prs[0];
     if (!pr) return null;
@@ -109,10 +180,10 @@ export class GitHubVcsService implements IPRService {
 
   async addComment(prId: string | number, comment: string, options?: CommentOptions): Promise<void> {
     if (options?.filePath) {
-      // Inline review comment — requires the PR's head commit SHA.
-      const pr = await this.request<{ head: { sha: string } }>(
+      // Inline review comments require the PR's current head commit SHA.
+      const pr = await this.api.request<{ head: { sha: string } }>(
         'GET',
-        `/repos/${this.owner}/${this.repo}/pulls/${prId}`,
+        this.path(`/pulls/${prId}`),
       );
       const payload: Record<string, unknown> = {
         body:      comment,
@@ -120,6 +191,7 @@ export class GitHubVcsService implements IPRService {
         path:      options.filePath,
         side:      'RIGHT',
       };
+
       if (options.startLine !== undefined) {
         if (options.endLine !== undefined && options.endLine !== options.startLine) {
           payload.start_line = options.startLine;
@@ -128,27 +200,33 @@ export class GitHubVcsService implements IPRService {
         } else {
           payload.line = options.startLine;
         }
+      } else {
+        // GitHub supports a file-level review comment when no line is given.
+        payload.subject_type = 'file';
       }
-      await this.request('POST', `/repos/${this.owner}/${this.repo}/pulls/${prId}/comments`, payload);
+
+      await this.api.request('POST', this.path(`/pulls/${prId}/comments`), payload);
     } else {
-      await this.request('POST', `/repos/${this.owner}/${this.repo}/issues/${prId}/comments`, {
-        body: comment,
-      });
+      await this.api.request(
+        'POST',
+        this.path(`/issues/${prId}/comments`),
+        { body: comment },
+      );
     }
   }
 
   async linkWorkItem(prId: string | number, ticketId: string): Promise<void> {
     // GitHub has no native work-item links — append the reference to the PR body.
-    const pr = await this.request<{ body: string | null }>(
+    const pr = await this.api.request<{ body: string | null }>(
       'GET',
-      `/repos/${this.owner}/${this.repo}/pulls/${prId}`,
+      this.path(`/pulls/${prId}`),
     );
 
     const existing = pr.body ?? '';
     const ref      = `\n\n---\nLinked ticket: ${ticketId}`;
     if (existing.includes(ref)) return;
 
-    await this.request('PATCH', `/repos/${this.owner}/${this.repo}/pulls/${prId}`, {
+    await this.api.request('PATCH', this.path(`/pulls/${prId}`), {
       body: existing + ref,
     });
   }
@@ -156,19 +234,15 @@ export class GitHubVcsService implements IPRService {
   // ── PR management ─────────────────────────────────────────────────────────
 
   async listPRs(): Promise<PRSummary[]> {
-    const prs = await this.request<GHPullRequest[]>(
-      'GET',
-      `/repos/${this.owner}/${this.repo}/pulls?state=open&per_page=100`,
+    const prs = await this.api.getPaginated<GHPullRequest>(
+      this.path('/pulls?state=open'),
     );
 
-    // Fetch reviews for each PR concurrently to get vote states.
+    // Fetch reviews for each PR concurrently to get the latest vote states.
     const allReviews = await Promise.all(
-      prs.map(pr =>
-        this.request<GHReview[]>(
-          'GET',
-          `/repos/${this.owner}/${this.repo}/pulls/${pr.number}/reviews`,
-        ),
-      ),
+      prs.map((pr) => this.api.getPaginated<GHReview>(
+        this.path(`/pulls/${pr.number}/reviews`),
+      )),
     );
 
     return prs.map((pr, i) => ({
@@ -181,14 +255,14 @@ export class GitHubVcsService implements IPRService {
       authorEmail:  pr.user.login, // GitHub login is the identity — config.user should match
       isDraft:      pr.draft,
       createdAt:    new Date(pr.created_at),
-      reviewers:    this.buildReviewers(pr.requested_reviewers, allReviews[i] ?? []),
+      reviewers:    this.buildReviewers(pr.requested_reviewers ?? [], allReviews[i] ?? []),
     }));
   }
 
   async getPR(prId: number): Promise<PullRequest> {
-    const pr = await this.request<GHPullRequest>(
+    const pr = await this.api.request<GHPullRequest>(
       'GET',
-      `/repos/${this.owner}/${this.repo}/pulls/${prId}`,
+      this.path(`/pulls/${prId}`),
     );
     return { id: pr.number, title: pr.title, url: pr.html_url, status: pr.state };
   }
@@ -196,20 +270,19 @@ export class GitHubVcsService implements IPRService {
   async votePR(prId: number, vote: PRVote): Promise<void> {
     if (vote === 'reset') {
       // Dismiss the user's most recent approvable review.
-      const myLogin = this.config.get<string>('user')!;
-      const reviews = await this.request<GHReview[]>(
-        'GET',
-        `/repos/${this.owner}/${this.repo}/pulls/${prId}/reviews`,
+      const myLogin = (this.config.get<string>('user') ?? '').toLowerCase();
+      const reviews = await this.api.getPaginated<GHReview>(
+        this.path(`/pulls/${prId}/reviews`),
       );
       const myReview = reviews
-        .filter(r => r.user.login === myLogin &&
-          (r.state === 'APPROVED' || r.state === 'CHANGES_REQUESTED'))
+        .filter((review) => review.user.login.toLowerCase() === myLogin &&
+          (review.state === 'APPROVED' || review.state === 'CHANGES_REQUESTED'))
         .pop();
 
       if (myReview) {
-        await this.request(
+        await this.api.request(
           'PUT',
-          `/repos/${this.owner}/${this.repo}/pulls/${prId}/reviews/${myReview.id}/dismissals`,
+          this.path(`/pulls/${prId}/reviews/${myReview.id}/dismissals`),
           { message: 'Vote reset via flowlane.' },
         );
       }
@@ -223,7 +296,7 @@ export class GitHubVcsService implements IPRService {
       'reject':                   'REQUEST_CHANGES',
     };
 
-    await this.request('POST', `/repos/${this.owner}/${this.repo}/pulls/${prId}/reviews`, {
+    await this.api.request('POST', this.path(`/pulls/${prId}/reviews`), {
       event: eventMap[vote],
       body:  vote === 'approve-with-suggestions' ? 'Approved with suggestions.' : '',
     });
@@ -238,77 +311,82 @@ export class GitHubVcsService implements IPRService {
       'rebase-merge': 'rebase',
     };
 
-    await this.request('PUT', `/repos/${this.owner}/${this.repo}/pulls/${prId}/merge`, {
+    await this.api.request('PUT', this.path(`/pulls/${prId}/merge`), {
       merge_method: methodMap[strategy],
     });
   }
 
   async abandonPR(prId: number): Promise<void> {
-    await this.request('PATCH', `/repos/${this.owner}/${this.repo}/pulls/${prId}`, {
-      state: 'closed',
-    });
+    await this.api.request('PATCH', this.path(`/pulls/${prId}`), { state: 'closed' });
   }
 
   async publishPR(prId: number): Promise<void> {
-    await this.request('PATCH', `/repos/${this.owner}/${this.repo}/pulls/${prId}`, {
-      draft: false,
-    });
+    await this.api.request('PATCH', this.path(`/pulls/${prId}`), { draft: false });
   }
 
-  async getThreads(prId: number, _activeOnly = true): Promise<PRThread[]> {
-    // Fetch inline review comments and general issue comments in parallel.
-    const [reviewComments, issueComments] = await Promise.all([
-      this.request<GHReviewComment[]>(
-        'GET',
-        `/repos/${this.owner}/${this.repo}/pulls/${prId}/comments?per_page=100`,
-      ),
-      this.request<GHIssueComment[]>(
-        'GET',
-        `/repos/${this.owner}/${this.repo}/issues/${prId}/comments?per_page=100`,
-      ),
+  async getThreads(prId: number, activeOnly = true): Promise<PRThread[]> {
+    // REST provides all comments and replies; GraphQL provides resolved state
+    // and stable review-thread IDs, which REST does not expose consistently.
+    const reviewThreadsPromise = this.api.hasToken
+      ? this.getReviewThreadMetadata(prId)
+      : Promise.resolve<GHReviewThreadNode[]>([]);
+    const [reviewComments, issueComments, reviewThreads] = await Promise.all([
+      this.api.getPaginated<GHReviewComment>(this.path(`/pulls/${prId}/comments`)),
+      this.api.getPaginated<GHIssueComment>(this.path(`/issues/${prId}/comments`)),
+      reviewThreadsPromise,
     ]);
 
-    const threads: PRThread[] = [];
+    const metadataByRootComment = new Map<number, GHReviewThreadNode>();
+    for (const thread of reviewThreads) {
+      const rootCommentId = thread.comments.nodes[0]?.databaseId;
+      if (rootCommentId != null) metadataByRootComment.set(rootCommentId, thread);
+    }
 
-    // Group inline comments into threads using the reply chain.
-    const rootComments = reviewComments.filter(c => !c.in_reply_to_id);
+    const rootComments = reviewComments.filter((comment) =>
+      !comment.isDeleted && comment.in_reply_to_id === undefined,
+    );
     const replyMap = new Map<number, GHReviewComment[]>();
-    for (const c of reviewComments) {
-      if (c.in_reply_to_id !== undefined) {
-        const arr = replyMap.get(c.in_reply_to_id) ?? [];
-        arr.push(c);
-        replyMap.set(c.in_reply_to_id, arr);
+    for (const comment of reviewComments) {
+      if (!comment.isDeleted && comment.in_reply_to_id !== undefined) {
+        const replies = replyMap.get(comment.in_reply_to_id) ?? [];
+        replies.push(comment);
+        replyMap.set(comment.in_reply_to_id, replies);
       }
     }
 
+    const threads: PRThread[] = [];
     for (const root of rootComments) {
-      const replies = replyMap.get(root.id) ?? [];
-      const all = [root, ...replies].sort(
+      const metadata = metadataByRootComment.get(root.id);
+      const status: PRThread['status'] = metadata?.isResolved ? 'resolved' : 'active';
+      if (activeOnly && status !== 'active') continue;
+
+      const comments = [root, ...(replyMap.get(root.id) ?? [])].sort(
         (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
       );
 
       threads.push({
-        id:        root.id,
-        status:    'active',
-        filePath:  root.path || undefined,
-        startLine: root.line ?? root.original_line ?? undefined,
-        comments:  all.map(c => ({
-          author:      c.user.login,
-          content:     c.body,
-          publishedAt: new Date(c.created_at),
+        id:         root.id,
+        providerId: metadata?.id,
+        status,
+        filePath:   root.path || metadata?.path || undefined,
+        startLine:  root.line ?? root.original_line ?? metadata?.startLine ?? metadata?.line ?? undefined,
+        comments:   comments.map((comment) => ({
+          author:      comment.user?.login ?? 'Unknown',
+          content:     comment.body,
+          publishedAt: new Date(comment.created_at),
         })),
       });
     }
 
-    // Each general issue comment is its own standalone thread.
-    for (const c of issueComments) {
+    // General issue comments are standalone active threads.
+    for (const comment of issueComments.filter((candidate) => !candidate.isDeleted)) {
       threads.push({
-        id:      c.id,
+        id:      comment.id,
         status:  'active',
         comments: [{
-          author:      c.user.login,
-          content:     c.body,
-          publishedAt: new Date(c.created_at),
+          author:      comment.user?.login ?? 'Unknown',
+          content:     comment.body,
+          publishedAt: new Date(comment.created_at),
         }],
       });
     }
@@ -316,32 +394,74 @@ export class GitHubVcsService implements IPRService {
     return threads;
   }
 
-  async resolveThread(_prId: number, _threadId: number): Promise<void> {
-    // GitHub thread resolution is only available via GraphQL, not the REST API.
-    throw new Error('Thread resolution is not supported for GitHub via the REST API. Use the GitHub web interface to resolve review threads.');
+  async resolveThread(prId: number, threadId: number): Promise<void> {
+    if (!this.api.hasToken) {
+      throw new GitHubApiError(
+        'Resolving GitHub review threads requires a token. Add one with `flowlane init` or `flowlane config set token`.',
+      );
+    }
+
+    const threads = await this.getThreads(prId, false);
+    const thread = threads.find((candidate) => candidate.id === threadId);
+
+    if (!thread) {
+      throw new Error(`Thread #${threadId} was not found on PR #${prId}.`);
+    }
+    if (!thread.providerId) {
+      throw new Error('Only inline GitHub review threads can be resolved; general comments cannot be resolved.');
+    }
+    if (thread.status === 'resolved') return;
+
+    await this.api.graphql(RESOLVE_REVIEW_THREAD_MUTATION, { threadId: thread.providerId });
   }
 
   async replyToThread(prId: number, threadId: number, comment: string): Promise<void> {
-    await this.request('POST', `/repos/${this.owner}/${this.repo}/pulls/${prId}/comments`, {
+    await this.api.request('POST', this.path(`/pulls/${prId}/comments`), {
       body:        comment,
       in_reply_to: threadId,
     });
   }
 
   async getChangedFiles(prId: number): Promise<PRFile[]> {
-    const files = await this.request<GHPullFile[]>(
-      'GET',
-      `/repos/${this.owner}/${this.repo}/pulls/${prId}/files?per_page=100`,
+    const files = await this.api.getPaginated<GHPullFile>(
+      this.path(`/pulls/${prId}/files`),
     );
 
-    return files.map(f => ({
-      path:         f.filename,
-      changeType:   this.mapFileStatus(f.status),
-      originalPath: f.previous_filename,
+    return files.map((file) => ({
+      path:         file.filename,
+      changeType:   this.mapFileStatus(file.status),
+      originalPath: file.previous_filename,
     }));
   }
 
   // ── helpers ────────────────────────────────────────────────────────────────
+
+  private path(suffix: string): string {
+    return `/repos/${encodeURIComponent(this.owner)}/${encodeURIComponent(this.repo)}${suffix}`;
+  }
+
+  private async getReviewThreadMetadata(prId: number): Promise<GHReviewThreadNode[]> {
+    const threads: GHReviewThreadNode[] = [];
+    let after: string | null = null;
+
+    for (;;) {
+      const data: GHReviewThreadsData = await this.api.graphql<GHReviewThreadsData>(REVIEW_THREADS_QUERY, {
+        owner: this.owner,
+        repo: this.repo,
+        number: prId,
+        after,
+      });
+      const connection: GHReviewThreadConnection | undefined = data.repository?.pullRequest?.reviewThreads;
+      if (!connection) {
+        throw new Error(`Pull request #${prId} was not found or review threads are unavailable.`);
+      }
+
+      threads.push(...connection.nodes);
+      if (!connection.pageInfo.hasNextPage) return threads;
+      after = connection.pageInfo.endCursor;
+      if (!after) throw new Error('GitHub returned a review-thread page without a cursor.');
+    }
+  }
 
   private buildReviewers(
     requested: Array<{ login: string }>,
@@ -357,14 +477,14 @@ export class GitHubVcsService implements IPRService {
     const seen = new Set<string>();
 
     for (const [login, review] of latestByUser) {
-      seen.add(login);
+      seen.add(login.toLowerCase());
       result.push({ name: login, email: login, vote: this.mapReviewState(review.state) });
     }
 
-    // Add requested reviewers who haven't submitted a review yet.
-    for (const r of requested) {
-      if (!seen.has(r.login)) {
-        result.push({ name: r.login, email: r.login, vote: 0 });
+    // Add requested reviewers who have not submitted a review yet.
+    for (const reviewer of requested) {
+      if (!seen.has(reviewer.login.toLowerCase())) {
+        result.push({ name: reviewer.login, email: reviewer.login, vote: 0 });
       }
     }
 
@@ -383,35 +503,5 @@ export class GitHubVcsService implements IPRService {
     if (status === 'modified') return 'edit';
     if (status === 'renamed')  return 'rename';
     return 'other';
-  }
-
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const url = path.startsWith('http') ? path : `${this.baseUrl}${path}`;
-
-    const res = await fetch(url, {
-      method,
-      headers: {
-        Authorization:          `Bearer ${this.token}`,
-        Accept:                 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        'Content-Type':         'application/json',
-        'User-Agent':           'flowlane-cli',
-      },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-
-    const text = await res.text();
-
-    if (!res.ok) {
-      let message = `GitHub API error ${res.status}`;
-      try {
-        const json = JSON.parse(text) as { message?: string; errors?: unknown[] };
-        if (json.message) message += `: ${json.message}`;
-        if (json.errors)  message += ` ${JSON.stringify(json.errors)}`;
-      } catch { /* use raw text */ }
-      throw new Error(message);
-    }
-
-    return text ? (JSON.parse(text) as T) : ({} as T);
   }
 }

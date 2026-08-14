@@ -7,7 +7,7 @@ import { ConfigService } from '../config/ConfigService';
 
 const VALID_CONFIG_KEYS = new Set<keyof FlowlaneConfig>([
   'platform', 'authMethod', 'org', 'project', 'repo', 'token',
-  'user', 'baseBranch', 'baseUrl', 'team', 'activeStatus', 'activeColumn',
+  'user', 'baseBranch', 'baseUrl', 'githubGraphqlUrl', 'team', 'activeStatus', 'activeColumn',
   'reviewStatus', 'reviewColumn', 'closedStates',
   'hookAfterBranch', 'hookAfterPR', 'hookAfterReview', 'hookAfterStart', 'hookAfterComment',
 ]);

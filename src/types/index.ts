@@ -33,11 +33,13 @@ export interface FlowlaneConfig {
   org: string;
   project: string;
   repo?: string;
-  /** Required when authMethod is 'pat' (or unset). Not used with 'az-cli'. */
+  /** Optional for public GitHub reads; required for writes and GraphQL operations. */
   token?: string;
   user: string;
   baseBranch?: string;
   baseUrl?: string;
+  /** Optional GitHub GraphQL endpoint for Enterprise installations. */
+  githubGraphqlUrl?: string;
   /** Azure DevOps team name (used to read board columns). */
   team?: string;
   /** System.State value set when starting work (e.g. "Active"). */
@@ -91,7 +93,10 @@ export interface PRSummary {
 
 /** A single comment thread on a pull request. */
 export interface PRThread {
+  /** Stable provider-facing comment/thread identifier used by direct commands. */
   id: number;
+  /** Optional opaque provider thread ID (for APIs such as GitHub GraphQL). */
+  providerId?: string;
   status: 'active' | 'resolved' | 'pending' | 'closed' | 'other';
   /** File path for inline threads. Undefined for general comments. */
   filePath?: string;

@@ -13,9 +13,9 @@ const ALWAYS_REQUIRED: ReadonlyArray<keyof FlowlaneConfig> = [
   'user',
 ];
 
-/** token is only required when not using az-cli auth */
+/** GitHub can read public resources anonymously; other providers need credentials. */
 function requiredFields(config: Partial<FlowlaneConfig>): ReadonlyArray<keyof FlowlaneConfig> {
-  if (config.authMethod === 'az-cli') return ALWAYS_REQUIRED;
+  if (config.authMethod === 'az-cli' || config.platform === 'github') return ALWAYS_REQUIRED;
   return [...ALWAYS_REQUIRED, 'token'];
 }
 

@@ -1,8 +1,8 @@
 # flowlane
 
-**Ticket → Branch → PR** — command-line workflow automation for Azure DevOps Boards.
+**Ticket → Branch → PR** — command-line workflow automation for Azure DevOps and GitHub.
 
-flowlane bridges your Azure DevOps board and your local git workflow. Instead of switching between a browser, terminal, and IDE to manage tickets, create branches, and update statuses — flowlane lets you do all of that from a single CLI.
+flowlane bridges your ticket provider, pull-request provider, and local Git workflow. Instead of switching between a browser, terminal, and IDE to manage tickets, create branches, and update statuses — flowlane lets you do all of that from a single CLI.
 
 ---
 
@@ -24,10 +24,8 @@ flowlane --version
 
 - **Node.js** 18 or later
 - **git** installed and on your `PATH`
-- An **Azure DevOps Personal Access Token** with the following scopes:
-  - Work Items — Read & Write
-  - Code — Read & Write
-  - Pull Request Threads — Read & Write
+- For Azure DevOps: a **Personal Access Token** with Work Items, Code, and Pull Request Threads read/write scopes.
+- For GitHub: a token is optional for public read-only access, but recommended for the higher rate limit and required for writes and review-thread resolution.
 
 ---
 
@@ -37,7 +35,7 @@ flowlane --version
 flowlane init
 ```
 
-The interactive wizard asks for your platform, organisation, project, token, and user identity, then saves everything to `~/.config/flowlane/config.json`.
+The interactive wizard asks for your platform, organisation, project, token, and user identity, then saves everything to `~/.config/flowlane/config.json`. For GitHub, the token may be left blank for public read-only access; flowlane uses the anonymous rate limit until a token is configured.
 
 For per-repository overrides (e.g. a different profile or base branch):
 
@@ -112,7 +110,10 @@ Creates a pull request linked to the work item. The ticket ID is inferred from t
 ```bash
 flowlane pr          # infer ticket from current branch
 flowlane pr 1234
+flowlane pr 1234 --draft  # non-interactive draft PR
 ```
+
+In interactive mode, flowlane asks whether the PR should be a draft. In non-interactive mode, it never prompts; use `--draft` to create a draft PR.
 
 > You must be on a feature branch (not detached HEAD) to create a PR.
 
@@ -175,6 +176,8 @@ flowlane pr threads 42
 flowlane pr threads --all          # include resolved threads
 flowlane pr threads 42 --json
 ```
+
+For GitHub, inline review-thread status and resolution use the GraphQL API and therefore require a token with permission to read and resolve review threads. Without a token, public REST comments remain readable but thread status is treated as active and resolution is unavailable. General PR comments can be displayed and replied to only when a token is configured.
 
 ---
 
@@ -300,15 +303,16 @@ Global config is stored at `~/.config/flowlane/config.json` and supports multipl
 
 | Key | Required | Description |
 |-----|----------|-------------|
-| `platform` | ✓ | `azuredevops` (Jira support planned) |
+| `platform` | ✓ | `azuredevops`, `github`, or `jira` (Jira operations are still planned) |
 | `org` | ✓ | Azure DevOps organisation name |
 | `project` | ✓ | Project name |
-| `token` | ✓ | Personal Access Token |
+| `token` | Conditional | Required for Azure DevOps/Jira and GitHub writes/GraphQL; optional for public GitHub reads |
 | `user` | ✓ | Your email or display name — used to filter assigned tickets |
 | `authMethod` | — | `pat` (default) or `az-cli` — how to authenticate |
 | `repo` | — | Git repository name. Defaults to `project` |
 | `baseBranch` | — | PR target branch. Defaults to `main` |
-| `baseUrl` | — | Self-hosted Azure DevOps URL |
+| `baseUrl` | — | Self-hosted Azure DevOps URL or GitHub REST API base URL |
+| `githubGraphqlUrl` | — | Optional GitHub GraphQL endpoint for Enterprise installations |
 | `team` | — | Azure DevOps team name. Required for board column operations |
 
 ### Workflow status mapping

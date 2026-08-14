@@ -35,7 +35,20 @@ flowlane --version
 npm run dev -- tickets     # run via ts-node without building
 npm run build              # compile TypeScript to dist/
 npm run build:watch        # watch mode
+npm test                   # discover and run all tests under tests/
 npm run clean              # remove dist/
+```
+
+---
+
+## Publishing boundary
+
+Production TypeScript lives under `src/` and is compiled to `dist/`. Tests live under `tests/` and are intentionally outside the production compiler input. `npm test` discovers every `*.test.ts` file under `tests/` through `tests/run.ts`, so new tests do not require changing the npm script. The `package.json` `files` allowlist publishes only `dist/`, `README.md`, and `LICENSE.md`; `npm run build` clears `dist/` first so stale test output cannot be published.
+
+Verify the package contents without creating an archive:
+
+```bash
+npm pack --dry-run
 ```
 
 ---
@@ -53,6 +66,7 @@ src/
 ├── services/
 │   ├── interfaces/       ITicketService, IPRService, IGitService, IConfigService
 │   ├── azuredevops/      Azure DevOps ticket + PR service implementations
+│   ├── github/           GitHub REST/GraphQL client, issue, and PR services
 │   ├── jira/             Jira stubs (planned)
 │   └── git/              GitService — wraps git CLI via child_process
 ├── commands/             One file per CLI command
@@ -62,7 +76,7 @@ src/
     └── boardStatusFix.ts Interactive recovery when a status update fails
 ```
 
-To add a new platform: implement the interfaces under `src/services/<platform>/` and add a `case` in the two factories in `src/container.ts`. No changes to commands are needed.
+To add a new platform: implement the interfaces under `src/services/<platform>/` and add a `case` in the two factories in `src/container.ts`. No changes to commands are needed. Provider tests belong under `tests/`, are automatically included by `npm test`, mock `fetch`, and must never contact a live repository.
 
 ---
 

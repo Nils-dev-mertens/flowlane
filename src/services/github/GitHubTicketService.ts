@@ -3,6 +3,7 @@ import type { ITicketService } from '../interfaces/ITicketService';
 import type { IConfigService } from '../interfaces/IConfigService';
 import type { Ticket } from '../../types';
 import { TOKENS } from '../../tokens';
+import { GitHubApiClient } from './GitHubApiClient';
 
 interface GitHubIssue {
   number: number;
@@ -19,41 +20,47 @@ interface GitHubIssue {
 export class GitHubTicketService implements ITicketService {
   private readonly owner: string;
   private readonly repo: string;
-  private readonly token: string;
-  private readonly baseUrl = 'https://api.github.com';
+  private readonly api: GitHubApiClient;
 
   constructor(@inject(TOKENS.ConfigService) private readonly config: IConfigService) {
     this.owner = config.get<string>('org')!;
     this.repo  = config.get<string>('repo') ?? config.get<string>('project')!;
-    this.token = config.get<string>('token')!;
+    this.api   = new GitHubApiClient({
+      token:      config.get<string>('token'),
+      baseUrl:    config.get<string>('baseUrl'),
+      graphqlUrl: config.get<string>('githubGraphqlUrl'),
+    });
   }
 
   async getTicket(id: string): Promise<Ticket> {
-    const issue = await this.request<GitHubIssue>(
+    const issue = await this.api.request<GitHubIssue>(
       'GET',
-      `/repos/${this.owner}/${this.repo}/issues/${id}`,
+      this.path(`/issues/${encodeURIComponent(id)}`),
     );
     return this.toTicket(issue);
   }
 
   async getTicketsForUser(user: string): Promise<Ticket[]> {
-    const issues = await this.request<GitHubIssue[]>(
-      'GET',
-      `/repos/${this.owner}/${this.repo}/issues?state=open&assignee=${encodeURIComponent(user)}&per_page=100`,
+    const issues = await this.api.getPaginated<GitHubIssue>(
+      this.path(`/issues?state=open&assignee=${encodeURIComponent(user)}`),
     );
-    // Exclude pull requests (GitHub returns them in /issues)
-    return issues.filter((i) => !i.pull_request).map((i) => this.toTicket(i));
+    // Exclude pull requests (GitHub returns them in /issues).
+    return issues.filter((issue) => !issue.pull_request).map((issue) => this.toTicket(issue));
   }
 
   async updateStatus(id: string, state: string): Promise<void> {
-    // GitHub issues only support open/closed
+    // GitHub issues only support open/closed.
     const ghState = /^clos/i.test(state) ? 'closed' : 'open';
-    await this.request('PATCH', `/repos/${this.owner}/${this.repo}/issues/${id}`, {
-      state: ghState,
-    });
+    await this.api.request(
+      'PATCH',
+      this.path(`/issues/${encodeURIComponent(id)}`),
+      { state: ghState },
+    );
   }
 
-  // ── helpers ────────────────────────────────────────────────────────────────
+  private path(suffix: string): string {
+    return `/repos/${encodeURIComponent(this.owner)}/${encodeURIComponent(this.repo)}${suffix}`;
+  }
 
   private toTicket(issue: GitHubIssue): Ticket {
     return {
@@ -65,34 +72,5 @@ export class GitHubTicketService implements ITicketService {
       description: issue.body ?? undefined,
       type:        issue.labels[0]?.name,
     };
-  }
-
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const url = path.startsWith('http') ? path : `${this.baseUrl}${path}`;
-
-    const res = await fetch(url, {
-      method,
-      headers: {
-        Authorization:  `Bearer ${this.token}`,
-        Accept:         'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        'Content-Type': 'application/json',
-        'User-Agent':   'flowlane-cli',
-      },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-
-    const text = await res.text();
-
-    if (!res.ok) {
-      let message = `GitHub API error ${res.status}`;
-      try {
-        const json = JSON.parse(text) as { message?: string };
-        if (json.message) message += `: ${json.message}`;
-      } catch { /* use raw text */ }
-      throw new Error(message);
-    }
-
-    return text ? (JSON.parse(text) as T) : ({} as T);
   }
 }

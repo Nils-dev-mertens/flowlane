@@ -14,6 +14,8 @@ export interface PROptions {
   interactive?: boolean;
   /** Override the source branch (defaults to current git branch). */
   sourceBranch?: string;
+  /** Create a draft PR in non-interactive mode. Defaults to false. */
+  draft?: boolean;
 }
 
 /**
@@ -87,14 +89,18 @@ export async function prCommand(
     p.log.step(`${chalk.green(sourceBranch)} → ${chalk.blue(targetBranch)}`);
   }
 
-  const draftAnswer = await p.confirm({
-    message: 'Create as draft PR?',
-    initialValue: false,
-  });
-  if (p.isCancel(draftAnswer)) {
-    throw new Error('Cancelled');
+  if (interactive) {
+    const draftAnswer = await p.confirm({
+      message: 'Create as draft PR?',
+      initialValue: false,
+    });
+    if (p.isCancel(draftAnswer)) {
+      throw new Error('Cancelled');
+    }
+    isDraft = draftAnswer;
+  } else {
+    isDraft = options.draft ?? false;
   }
-  isDraft = draftAnswer;
 
   // ── Create PR ─────────────────────────────────────────────────────────────
 

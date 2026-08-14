@@ -6,9 +6,15 @@
   "bin": {
     "flowlane": "dist/index.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE.md"
+  ],
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf dist && tsc",
     "build:watch": "tsc --watch",
+    "test": "node --require ts-node/register --test tests/run.ts",
     "dev": "ts-node src/index.ts",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",

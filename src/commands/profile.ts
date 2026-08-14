@@ -191,17 +191,20 @@ export async function profileAddCommand(nameArg?: string): Promise<void> {
   }
 
   if (authMethod === 'pat') {
+    const tokenRequired = platform !== 'github';
     const tokenHint =
       platform === 'azuredevops'
         ? 'dev.azure.com → User Settings → Personal Access Tokens\nScopes: Work Items R+W, Code R+W, Pull Requests R+W'
         : platform === 'github'
-        ? 'github.com → Settings → Developer settings → Personal access tokens\nScopes: repo (full control)'
+        ? 'Optional for public reads. Recommended for the higher rate limit and all writes.\ngithub.com → Settings → Developer settings → Personal access tokens\nFor classic tokens use repo access; fine-grained tokens need access to this repository and issue/pull-request permissions.'
         : 'id.atlassian.com → Manage profile → Security → API tokens';
     p.note(tokenHint, 'How to get a token');
 
     const pat = await p.password({
-      message: 'API token / PAT:',
-      validate: (v) => v.trim() ? undefined : 'Required',
+      message: platform === 'github'
+        ? 'GitHub token (optional for public reads):'
+        : 'API token / PAT:',
+      validate: (v) => tokenRequired && !v.trim() ? 'Required' : undefined,
     }) as string;
     if (p.isCancel(pat)) { p.cancel('Cancelled.'); return; }
     token = pat.trim();
