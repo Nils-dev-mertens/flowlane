@@ -10,35 +10,38 @@ import Terminal from './Terminal.astro';
       </h2>
       <div class="space-y-6 text-on-surface-variant text-lg leading-relaxed">
         <p>
-          You're in the flow. The code is writing itself. Then you need a ticket ID — you alt-tab, Chrome opens,
-          and forty-seven tabs scream for attention. You find the ticket, but wait — someone just replied on Slack.
+          You're in the flow. The code is writing itself. Then you need a ticket ID — alt-tab, Chrome,
+          forty-seven tabs screaming for attention. You find the ticket, but someone just replied on Slack.
         </p>
         <p class="border-l-4 border-primary pl-6 py-2 italic font-medium bg-primary/5">
-          "The modern developer workflow is a minefield of distractions disguised as tools."
+          "The terminal is where developers are most productive. Don't force them out of it."
         </p>
         <p>
-          flowlane is for the developer tired of the "browser dance" — and for the agile team that lives in
-          Azure DevOps, GitHub, or Jira. Link tickets, create branches, and push PRs without ever lifting your
-          hands from the home row.
+          flowlane started as a side project at <a href="https://saply.ai" target="_blank" rel="noreferrer" class="text-primary underline underline-offset-4 hover:opacity-80 transition-opacity">Saply</a> — one developer's refusal to do the browser dance,
+          grown into a tool used every day. It's for the developer who lives on the home row, and for the
+          team on Azure DevOps, GitHub, or Jira that wants tickets, branches, and PRs handled without
+          switching tools. Link tickets, create branches, and push PRs without ever lifting your hands
+          from the keyboard.
         </p>
       </div>
+      <p class="text-[10px] font-mono uppercase tracking-widest opacity-40">
+        Built with gratitude to the team at <a href="https://saply.ai" target="_blank" rel="noreferrer" class="text-primary underline underline-offset-4 hover:opacity-80 transition-opacity">Saply</a>, where flowlane began.
+      </p>
     </div>
 
-    <Terminal title="flowlane" frameClass="aspect-square p-10 md:p-12">
-      <div class="flex flex-col justify-between h-full gap-8">
-        <div class="flex justify-between items-start">
-          <span class="text-[8px] font-mono opacity-30">SYS_DEBUG_091.2</span>
-          <span class="material-symbols-outlined text-primary text-xl">architecture</span>
+    <Terminal title="flowlane start 14" frameClass="aspect-square p-10 md:p-12">
+      <div class="flex flex-col justify-between h-full gap-6">
+        <div>
+          <div class="text-tertiary-fixed-dim">$ flowlane start 14</div>
+          <div class="mt-4 space-y-1.5">
+            <div class="text-on-surface-variant">◇ 14 — Implement landingpage</div>
+            <div class="text-on-surface-variant">◇ Branch name: 14-implement-landingpage</div>
+            <div class="text-primary">◇ Pushed: 14-implement-landingpage</div>
+          </div>
         </div>
-        <div class="space-y-2">
-          <div class="h-1 w-1/2 bg-outline-variant/40"></div>
-          <div class="h-1 w-3/4 bg-outline-variant/20"></div>
-          <div class="h-1 w-1/4 bg-primary/40"></div>
-        </div>
-        <div class="text-[10px] font-mono text-secondary-fixed-dim leading-tight">
-          DETECTING_WORKFLOW_BLOAT...<br />
-          PURGING_BROWSER_DEPENDENCY...<br />
-          <span class="text-primary font-bold">STATUS: TERMINAL_FOCUSED</span>
+        <div class="border-t border-outline-variant/10 pt-4 text-[10px] leading-tight">
+          <div class="text-tertiary-fixed-dim">✓ Branch ready!</div>
+          <div class="text-on-surface-variant">Run flowlane pr 14 when you're ready to open a PR.</div>
         </div>
       </div>
     </Terminal>
