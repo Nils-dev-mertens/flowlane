@@ -1,0 +1,27 @@
+---
+interface Props {
+  /** Title shown in the terminal chrome bar. */
+  title?: string;
+  /** Extra classes for the terminal frame. */
+  frameClass?: string;
+}
+
+const { title = 'flowlane', frameClass = '' } = Astro.props;
+---
+
+<div
+  class:list={[
+    'bg-surface-container-lowest border border-outline-variant/20 relative flex flex-col overflow-hidden',
+    frameClass,
+  ]}
+>
+  <div class="flex items-center gap-1.5 px-4 py-3 border-b border-outline-variant/10 shrink-0">
+    <span class="w-2.5 h-2.5 bg-[#ff5545]/80"></span>
+    <span class="w-2.5 h-2.5 bg-[#ffb4aa]/40"></span>
+    <span class="w-2.5 h-2.5 bg-[#4fe169]/40"></span>
+    <span class="ml-3 text-[10px] font-mono uppercase tracking-widest opacity-40">{title}</span>
+  </div>
+  <div class="flex-1 p-5 font-mono text-[12px] leading-relaxed overflow-x-auto">
+    <slot />
+  </div>
+</div>

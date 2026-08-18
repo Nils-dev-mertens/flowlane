@@ -1,0 +1,47 @@
+---
+interface Props {
+  command: string;
+  /** Show the `$` shell prompt prefix (default true). */
+  prompt?: boolean;
+  /** Extra classes for the surrounding box. */
+  boxClass?: string;
+}
+
+const { command, prompt = true, boxClass = '' } = Astro.props;
+---
+
+<div
+  class:list={[
+    'w-full bg-surface-container-lowest border border-outline-variant/20 p-4 flex items-center justify-between group',
+    boxClass,
+  ]}
+>
+  <code class="font-mono text-sm md:text-base text-secondary break-all">
+    {prompt && <span class="opacity-50">$ </span>}{command}
+  </code>
+  <button
+    type="button"
+    class="copy-btn shrink-0 ml-4 p-2 text-on-surface-variant hover:text-primary transition-colors"
+    aria-label="Copy command to clipboard"
+  >
+    <span class="material-symbols-outlined text-sm">content_copy</span>
+  </button>
+</div>
+
+<script is:inline>
+  document.querySelectorAll('.copy-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const code = btn.parentElement?.querySelector('code')?.innerText ?? '';
+      const icon = btn.querySelector('.material-symbols-outlined');
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(code.replace(/^\$\s*/, '')).catch(() => {});
+      }
+      if (icon) {
+        icon.textContent = 'check';
+        setTimeout(() => {
+          icon.textContent = 'content_copy';
+        }, 1500);
+      }
+    });
+  });
+</script>

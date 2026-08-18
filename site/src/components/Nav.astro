@@ -1,0 +1,37 @@
+---
+const links = [
+  { href: '#story', label: 'Story' },
+  { href: '#features', label: 'Features' },
+  { href: '#integrations', label: 'Integrations' },
+  { href: '#install', label: 'Install' },
+  { href: '#community', label: 'Community' },
+];
+---
+
+<header
+  class="fixed top-0 w-full z-50 flex justify-between items-center px-6 md:px-8 py-4 bg-[#15121a]/80 backdrop-blur-xl"
+>
+  <a href="#top" class="text-2xl font-bold tracking-tighter text-[#ffb4aa] font-headline uppercase">
+    FLOWLANE
+  </a>
+
+  <nav class="hidden md:flex items-center space-x-10">
+    {
+      links.map((link) => (
+        <a
+          href={link.href}
+          class="text-[#e7e0ec] hover:text-[#ffb4aa] transition-colors duration-200 font-headline uppercase tracking-tight text-xs"
+        >
+          {link.label}
+        </a>
+      ))
+    }
+  </nav>
+
+  <a
+    href="#install"
+    class="bg-primary-container text-on-primary-container px-6 py-2 text-xs font-bold font-headline uppercase tracking-widest active:scale-95 transition-transform"
+  >
+    Get Started
+  </a>
+</header>

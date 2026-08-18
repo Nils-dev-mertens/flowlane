@@ -1,0 +1,117 @@
+---
+import Terminal from './Terminal.astro';
+---
+
+<section class="py-48 px-6 md:px-8 max-w-7xl mx-auto" id="features">
+  <div class="mb-24 text-center md:text-left">
+    <h2 class="text-5xl md:text-7xl font-black font-headline uppercase tracking-tighter mb-4">
+      AUTOMATE THE <span class="text-primary">BORING</span>
+    </h2>
+    <p class="text-on-surface-variant tracking-widest text-xs uppercase font-bold">Core Infrastructure Features</p>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-12 gap-8">
+    <!-- Large: Unified Ticket Access -->
+    <div class="md:col-span-8 bg-surface-container p-12 flex flex-col justify-between min-h-[400px] border border-outline-variant/10 relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 -rotate-45 translate-x-12 -translate-y-12" aria-hidden="true"></div>
+      <div>
+        <span class="material-symbols-outlined text-4xl text-primary mb-8" style="font-variation-settings: 'FILL' 1;">confirmation_number</span>
+        <h3 class="text-3xl font-bold font-headline mb-4 uppercase">Unified Ticket Access</h3>
+        <p class="text-on-surface-variant max-w-md">
+          Search, view, and update tickets from Jira, Azure DevOps, or GitHub issues without leaving your
+          terminal. <code class="text-secondary">flowlane tickets</code> — that's it.
+        </p>
+      </div>
+      <div class="mt-8 pt-8 border-t border-outline-variant/10 flex items-center justify-between">
+        <span class="text-[10px] font-mono uppercase tracking-widest opacity-40">Integration: Jira / Azure DevOps / GitHub</span>
+        <span class="material-symbols-outlined text-primary">arrow_forward</span>
+      </div>
+    </div>
+
+    <!-- Small: Smart Branching -->
+    <div class="md:col-span-4 bg-surface-container-high p-8 flex flex-col justify-between border border-outline-variant/10">
+      <div>
+        <span class="material-symbols-outlined text-3xl text-secondary mb-6">fork_right</span>
+        <h3 class="text-xl font-bold font-headline mb-3 uppercase">Smart Branching</h3>
+        <p class="text-sm text-on-surface-variant">
+          Auto-generate branch names from ticket titles. <code class="text-secondary">flowlane start 14</code>{' '}
+          creates <code class="text-secondary">14-implement-landingpage</code> instantly.
+        </p>
+      </div>
+      <div class="mt-6 text-[10px] font-mono uppercase opacity-40">Zero Manual Naming</div>
+    </div>
+
+    <!-- Small: PR Orchestration -->
+    <div class="md:col-span-4 bg-surface-container-high p-8 flex flex-col justify-between border border-outline-variant/10">
+      <div>
+        <span class="material-symbols-outlined text-3xl text-tertiary mb-6">publish</span>
+        <h3 class="text-xl font-bold font-headline mb-3 uppercase">PR Orchestration</h3>
+        <p class="text-sm text-on-surface-variant">
+          Push code and open a PR with the ticket link attached. Drafts, votes, review threads, and merge — all
+          from the terminal.
+        </p>
+      </div>
+      <div class="mt-6 text-[10px] font-mono uppercase opacity-40">Azure DevOps / GitHub</div>
+    </div>
+
+    <!-- Small: Review Sessions -->
+    <div class="md:col-span-4 bg-surface-container-high p-8 flex flex-col justify-between border border-outline-variant/10">
+      <div>
+        <span class="material-symbols-outlined text-3xl text-secondary mb-6" style="font-variation-settings: 'FILL' 1;">rate_review</span>
+        <h3 class="text-xl font-bold font-headline mb-3 uppercase">Review Sessions</h3>
+        <p class="text-sm text-on-surface-variant">
+          <code class="text-secondary">flowlane pr review</code> — one repeatable session for threads, files,
+          inline comments, votes, and merge.
+        </p>
+      </div>
+      <div class="mt-6 text-[10px] font-mono uppercase opacity-40">Threads / Files / Votes</div>
+    </div>
+
+    <!-- Small: Agent-Ready -->
+    <div class="md:col-span-4 bg-surface-container-high p-8 flex flex-col justify-between border border-outline-variant/10">
+      <div>
+        <span class="material-symbols-outlined text-3xl text-tertiary mb-6">terminal</span>
+        <h3 class="text-xl font-bold font-headline mb-3 uppercase">Agent-Ready</h3>
+        <p class="text-sm text-on-surface-variant">
+          <code class="text-secondary">--json</code> on every read command; auto non-interactive when piped or in
+          CI. Built for scripts and AI agents.
+        </p>
+      </div>
+      <div class="mt-6 text-[10px] font-mono uppercase opacity-40">Scripts / CI / JSON</div>
+    </div>
+
+    <!-- Large: Enterprise Power. Completely Free. -->
+    <div class="md:col-span-8 bg-surface-container-lowest p-12 flex items-center gap-12 border border-outline-variant/20 group hover:border-primary/40 transition-colors">
+      <div class="hidden md:block w-2/5">
+        <Terminal title="flowlane tickets">
+          <div class="text-tertiary-fixed-dim">$ flowlane tickets</div>
+          <div class="mt-3 space-y-1.5">
+            <div class="flex justify-between">
+              <span class="text-on-surface">[14] Implement landingpage</span>
+              <span class="text-primary">TODO</span>
+            </div>
+            <div class="flex justify-between opacity-60">
+              <span>[11] Stabilize GitHub PR auth</span>
+              <span class="text-tertiary-fixed-dim">ACTIVE</span>
+            </div>
+            <div class="flex justify-between opacity-40">
+              <span>[9] Add Jira ticket creation</span>
+              <span class="text-tertiary-fixed-dim">ACTIVE</span>
+            </div>
+          </div>
+          <div class="mt-4 animate-pulse inline-block w-2 h-4 bg-primary"></div>
+        </Terminal>
+      </div>
+      <div class="flex-1">
+        <span class="inline-block px-2 py-1 bg-tertiary-container text-on-tertiary-container text-[10px] font-black uppercase mb-6">
+          Always Free
+        </span>
+        <h3 class="text-3xl font-bold font-headline mb-4 uppercase">Enterprise Power. <br />Completely Free.</h3>
+        <p class="text-on-surface-variant">
+          MIT-licensed and built in the open. All core CLI features are free for individuals and teams — no
+          account, no billing page, no gates.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,33 @@
+---
+import pkg from '../../../package.json';
+
+const year = new Date().getFullYear();
+
+const links = [
+  { href: 'https://github.com/Nils-dev-mertens/flowlane#readme', label: 'Documentation' },
+  { href: 'https://github.com/Nils-dev-mertens/flowlane', label: 'GitHub' },
+  { href: 'https://www.npmjs.com/package/flowlane', label: 'npm' },
+  { href: 'https://github.com/Nils-dev-mertens/flowlane/blob/main/LICENSE.md', label: 'License' },
+];
+---
+
+<footer class="w-full py-12 px-6 md:px-8 flex flex-col md:flex-row justify-between items-center gap-8 bg-surface-container-low">
+  <div>
+    <div class="text-lg font-black text-[#ffb4aa] font-headline uppercase tracking-tight mb-2">FLOWLANE</div>
+    <p class="text-[#e7e0ec]/60 font-headline text-[10px] tracking-widest uppercase">
+      © {year} FLOWLANE · v{pkg.version} · MIT
+    </p>
+  </div>
+  <div class="flex flex-wrap gap-8 justify-center">
+    {
+      links.map((link) => (
+        <a
+          href={link.href}
+          class="font-headline text-xs tracking-widest uppercase text-[#e7e0ec]/60 hover:text-[#ffb4aa] underline underline-offset-4 transition-colors"
+        >
+          {link.label}
+        </a>
+      ))
+    }
+  </div>
+</footer>
