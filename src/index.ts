@@ -117,16 +117,17 @@ prCmd
   });
 
 prCmd
-  .command('comment <text>')
-  .description('Add a comment to the open PR for the current branch')
+  .command('comment [text]')
+  .description('Add a comment to the open PR for the current branch (text, stdin via "-", or --body-file)')
   .option('--file <path>', 'File path for an inline comment (e.g. src/foo.ts)')
   .option('--line <n>', 'Start line for an inline comment (1-based)', (v) => parseInt(v, 10))
   .option('--end-line <n>', 'End line for a multi-line inline comment (1-based)', (v) => parseInt(v, 10))
-  .action(async (text: string, opts: { file?: string; line?: number; endLine?: number }) => {
+  .option('--body-file <path>', 'Read the comment body from a file')
+  .action(async (text: string | undefined, opts: { file?: string; line?: number; endLine?: number; bodyFile?: string }) => {
     await ensureConfig();
     const { prCommentCommand } = await import('./commands/prComment');
     try {
-      await prCommentCommand(text, { file: opts.file, line: opts.line, endLine: opts.endLine });
+      await prCommentCommand(text, { file: opts.file, line: opts.line, endLine: opts.endLine, bodyFile: opts.bodyFile });
     } catch (err: unknown) {
       console.error(chalk.red(`Error: ${errMsg(err)}`));
       process.exit(1);
@@ -281,12 +282,13 @@ threadsCmd
 
 threadsCmd
   .command('reply <threadId> <text> [prId]')
-  .description('Reply to a comment thread by its ID')
-  .action(async (threadId: string, text: string, prId?: string) => {
+  .description('Reply to a comment thread by its ID (text, stdin via "-", or --body-file)')
+  .option('--body-file <path>', 'Read the reply body from a file (pass "-" as the text placeholder)')
+  .action(async (threadId: string, text: string, prId: string | undefined, opts: { bodyFile?: string }) => {
     await ensureConfig();
     const { prReplyThreadCommand } = await import('./commands/prReplyThread');
     try {
-      await prReplyThreadCommand(threadId, text, prId);
+      await prReplyThreadCommand(threadId, text, prId, opts.bodyFile);
     } catch (err: unknown) {
       console.error(chalk.red(`Error: ${errMsg(err)}`));
       process.exit(1);

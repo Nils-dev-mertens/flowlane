@@ -6,14 +6,22 @@ import { TOKENS } from '../tokens';
 import type { IPRService }     from '../services/interfaces/IPRService';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 import { runHook }             from '../utils/hooks';
+import { resolveTextInput }    from '../utils/textInput';
 
 export interface PrCommentOptions {
   file?: string;
   line?: number;
   endLine?: number;
+  /** Read the comment body from a file instead of the positional argument. */
+  bodyFile?: string;
 }
 
-export async function prCommentCommand(comment: string, options: PrCommentOptions = {}): Promise<void> {
+export async function prCommentCommand(comment: string | undefined, options: PrCommentOptions = {}): Promise<void> {
+  const text = await resolveTextInput(comment, options.bodyFile);
+  if (text == null) {
+    throw new Error('No comment text provided. Pass text, use "-" to read from stdin, or use --body-file <path>.');
+  }
+
   // Resolve current branch.
   let branch: string;
   try {
@@ -40,7 +48,7 @@ export async function prCommentCommand(comment: string, options: PrCommentOption
     ? { filePath: options.file, startLine: options.line, endLine: options.endLine }
     : undefined;
 
-  await prSvc.addComment(pr.id, comment, commentOptions);
+  await prSvc.addComment(pr.id, text, commentOptions);
 
   const location = options.file
     ? ` on ${chalk.dim(options.file)}${options.line ? chalk.dim(`:${options.line}`) : ''}`
