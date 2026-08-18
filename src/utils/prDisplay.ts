@@ -25,7 +25,8 @@ export function printThread(thread: PRThread, index: number): void {
   });
 }
 
-/** Word-wrap text to a width, preserving existing newlines. */
+/** Word-wrap text to a width, preserving existing newlines and hard-breaking
+ * tokens (URLs, code, long words) that exceed the width. */
 export function wrapText(text: string, width: number): string[] {
   return text.split('\n').flatMap((line) => {
     if (line.length <= width) return [line];
@@ -33,11 +34,21 @@ export function wrapText(text: string, width: number): string[] {
     const wrapped: string[] = [];
     let current = '';
     for (const word of words) {
-      if ((current + ' ' + word).trimStart().length > width) {
-        if (current) wrapped.push(current);
+      // A single token longer than the width must be hard-broken so it does
+      // not overflow the gutter (e.g. a long URL or inline code span).
+      if (word.length > width) {
+        if (current) { wrapped.push(current); current = ''; }
+        for (let i = 0; i < word.length; i += width) {
+          wrapped.push(word.slice(i, i + width));
+        }
+        continue;
+      }
+      const candidate = current ? `${current} ${word}` : word;
+      if (candidate.length > width) {
+        wrapped.push(current);
         current = word;
       } else {
-        current = current ? `${current} ${word}` : word;
+        current = candidate;
       }
     }
     if (current) wrapped.push(current);

@@ -18,6 +18,24 @@ test('wrapText preserves existing newlines', () => {
   assert.deepEqual(wrapText('hello\nworld foo bar', 8), ['hello', 'world', 'foo bar']);
 });
 
+test('wrapText hard-breaks tokens longer than the width', () => {
+  assert.deepEqual(wrapText('https://example.com/very/long/url', 12), [
+    'https://exam',
+    'ple.com/very',
+    '/long/url',
+  ]);
+});
+
+test('wrapText mixes long tokens with normal wrapping', () => {
+  assert.deepEqual(wrapText('see https://example.com/very/long/url here', 12), [
+    'see',
+    'https://exam',
+    'ple.com/very',
+    '/long/url',
+    'here',
+  ]);
+});
+
 test('formatAge renders minutes, hours, and days', () => {
   assert.equal(formatAge(new Date(Date.now() - 90_000)), '1m ago');
   assert.equal(formatAge(new Date(Date.now() - 2 * 3_600_000)), '2h ago');
