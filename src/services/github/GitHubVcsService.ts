@@ -12,6 +12,7 @@ import type {
 } from '../../types';
 import { TOKENS } from '../../tokens';
 import { GitHubApiClient, GitHubApiError } from './GitHubApiClient';
+import { resolveGithubToken } from '../../utils/ghCliAuth';
 
 /** Status codes GitHub can return transiently (503 during PR writes, etc.). */
 const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
@@ -170,7 +171,7 @@ export class GitHubVcsService implements IPRService {
     this.owner = gh.owner;
     this.repo  = gh.repo;
     this.api   = new GitHubApiClient({
-      token:      gh.token,
+      token:      resolveGithubToken(gh.token, gh.authMethod),
       baseUrl:    gh.baseUrl,
       graphqlUrl: gh.graphqlUrl,
     });

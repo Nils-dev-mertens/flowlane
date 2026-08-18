@@ -49,6 +49,8 @@ export interface GitHubProviderConfig extends ProviderConfigBase {
   owner: string;
   /** Repository name. */
   repo: string;
+  /** Auth source: stored PAT or the GitHub CLI (`gh auth token`). */
+  authMethod?: 'pat' | 'gh-cli';
   /** Optional API base URL for GitHub Enterprise. */
   baseUrl?: string;
   /** Optional GraphQL URL for GitHub Enterprise. */
@@ -145,8 +147,8 @@ export interface FlowlaneConfig {
   baseUrl?: string;
   /** @deprecated Mapped to `github.graphqlUrl`. */
   githubGraphqlUrl?: string;
-  /** @deprecated Mapped to `azuredevops.authMethod`. */
-  authMethod?: 'pat' | 'az-cli';
+  /** @deprecated Mapped to the provider's `authMethod`. */
+  authMethod?: 'pat' | 'az-cli' | 'gh-cli';
   /** @deprecated Mapped to `azuredevops.team`. */
   team?: string;
   /** @deprecated Mapped to `azuredevops.activeStatus`. */

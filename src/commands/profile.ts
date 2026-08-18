@@ -215,8 +215,11 @@ async function askProviderFields(
   const block: Record<string, unknown> = {};
 
   for (const field of spec.fields) {
-    // Azure DevOps skips the token when Azure CLI authentication is selected.
-    if (provider === 'azuredevops' && field.key === 'token' && block.authMethod === 'az-cli') {
+    // Skip the token when CLI-based authentication is selected (az-cli/gh-cli).
+    const cliAuth =
+      (provider === 'azuredevops' && block.authMethod === 'az-cli') ||
+      (provider === 'github' && block.authMethod === 'gh-cli');
+    if (field.key === 'token' && cliAuth) {
       continue;
     }
 

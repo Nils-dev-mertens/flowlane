@@ -24,8 +24,8 @@ flowlane --version
 
 - **Node.js** 18 or later
 - **git** installed and on your `PATH`
-- For Azure DevOps: a **Personal Access Token** with Work Items, Code, and Pull Request Threads read/write scopes.
-- For GitHub: a token is optional for public read-only access, but recommended for the higher rate limit and required for writes and review-thread resolution.
+- For Azure DevOps: a **Personal Access Token** with Work Items, Code, and Pull Request Threads read/write scopes (or the **Azure CLI** with `authMethod: az-cli`).
+- For GitHub: a token is optional for public read-only access, but recommended for the higher rate limit and required for writes and review-thread resolution. Alternatively, set `authMethod: gh-cli` and authenticate once with `gh auth login` — flowlane then resolves credentials from the GitHub CLI instead of storing a token.
 
 ---
 
@@ -362,9 +362,15 @@ Each provider is configured in its own nested block. `ticketProvider` and `vcsPr
 | `owner` | ✓ | GitHub owner (user or organization) |
 | `repo` | ✓ | Repository name |
 | `user` | ✓ | GitHub username/login (not an email) |
-| `token` | — | Optional for public reads; required for writes and GraphQL |
+| `token` | Conditional | PAT; not needed with `authMethod: gh-cli` |
+| `authMethod` | — | `pat` (default) or `gh-cli` (use `gh auth login`) |
 | `baseBranch` | — | PR target branch (default `main`) |
 | `baseUrl` / `graphqlUrl` | — | GitHub Enterprise REST/GraphQL endpoints |
+
+> With `authMethod: gh-cli` run `gh auth login` once to sign in. To also stop
+> `git push` (used by `flowlane start`/`flowlane branch`) from prompting for
+> credentials, run `gh auth setup-git` — it registers GitHub CLI as git's
+> credential helper.
 
 **`azuredevops`**
 

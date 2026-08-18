@@ -140,7 +140,8 @@ export class ConfigService implements IConfigService {
     }
 
     // Token requirement depends on the provider's auth mode. GitHub supports
-    // anonymous public reads; Azure DevOps may use az-cli instead of a PAT.
+    // anonymous public reads; Azure DevOps may use az-cli instead of a PAT and
+    // GitHub may use the GitHub CLI (`gh auth token`) instead of a stored PAT.
     const authMethod = (block.authMethod ?? 'pat') as string;
     const needsToken =
       provider === 'jira' ||

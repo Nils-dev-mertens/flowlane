@@ -4,6 +4,7 @@ import type { IConfigService } from '../interfaces/IConfigService';
 import type { CreateTicketParams, Ticket } from '../../types';
 import { TOKENS } from '../../tokens';
 import { GitHubApiClient, GitHubApiError } from './GitHubApiClient';
+import { resolveGithubToken } from '../../utils/ghCliAuth';
 
 interface GitHubIssue {
   number: number;
@@ -27,7 +28,7 @@ export class GitHubTicketService implements ITicketService {
     this.owner = gh.owner;
     this.repo  = gh.repo;
     this.api   = new GitHubApiClient({
-      token:      gh.token,
+      token:      resolveGithubToken(gh.token, gh.authMethod),
       baseUrl:    gh.baseUrl,
       graphqlUrl: gh.graphqlUrl,
     });
