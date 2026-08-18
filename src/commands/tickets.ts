@@ -7,7 +7,7 @@ import { TOKENS } from '../tokens';
 import { fetchBoardColumns } from '../utils/azureBoard';
 import { getAzCliToken } from '../utils/azCliAuth';
 import { ticketIdFromBranch } from '../utils/branch';
-import { isInteractive } from '../utils/tty';
+import { isInteractive, safeSpinner } from '../utils/tty';
 import { providerDescriptor } from '../config/providers';
 import { workflowTarget } from '../utils/workflowTarget';
 import type { IConfigService } from '../services/interfaces/IConfigService';
@@ -98,7 +98,7 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
   const ticketSvc = container.resolve<ITicketService>(TOKENS.TicketService);
   const user      = (options.user ?? ticketCfg.user ?? '').trim();
 
-  const spinner = p.spinner();
+  const spinner = safeSpinner();
   spinner.start(`Fetching tickets assigned to ${chalk.cyan(user)}…`);
 
   let tickets: Ticket[];
@@ -330,7 +330,7 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
       }
 
       // Fetch columns.
-      const fetchSpinner = p.spinner();
+      const fetchSpinner = safeSpinner();
       fetchSpinner.start(`Fetching board columns for "${team}"…`);
       let columns: Awaited<ReturnType<typeof fetchBoardColumns>> = [];
       try {
@@ -354,7 +354,7 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
 
       const col = columns.find((c) => c.name === pick)!;
 
-      const moveSpinner = p.spinner();
+      const moveSpinner = safeSpinner();
       moveSpinner.start(`Moving ticket to "${chalk.yellow(pick)}"…`);
       try {
         const colState = col.states[0];
@@ -448,7 +448,7 @@ export async function ticketsCommand(options: TicketsOptions = {}): Promise<void
       }
 
       try {
-        await prCommentCommand(text.trim(), { file, line, endLine });
+        await prCommentCommand(text.trim(), undefined, { file, line, endLine });
       } catch (err: unknown) {
         p.outro(chalk.red(`Error: ${errMsg(err)}`));
       }

@@ -1,8 +1,7 @@
-import * as p from '@clack/prompts';
 import chalk from 'chalk';
 import { execSync } from 'child_process';
 import type { IPRService } from '../services/interfaces/IPRService';
-import { isInteractive } from './tty';
+import { isInteractive, safeSpinner } from './tty';
 
 /**
  * Resolve a numeric PR ID.
@@ -31,7 +30,7 @@ export async function resolvePRId(
 
   // Only animate progress on a real terminal; scripts/JSON get plain output.
   const interactive = isInteractive();
-  const spinner = interactive ? p.spinner() : null;
+  const spinner = interactive ? safeSpinner() : null;
   spinner?.start(`Finding PR for branch "${chalk.cyan(branch)}"…`);
   if (!interactive) process.stderr.write(`Finding PR for branch "${branch}"…\n`);
 

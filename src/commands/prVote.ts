@@ -6,6 +6,7 @@ import { TOKENS }      from '../tokens';
 import type { IPRService } from '../services/interfaces/IPRService';
 import type { PRVote }     from '../types';
 import { resolvePRId }     from '../utils/prResolve';
+import { safeSpinner }     from '../utils/tty';
 
 // ── approve (shorthand) ───────────────────────────────────────────────────────
 
@@ -25,7 +26,7 @@ export async function prApproveCommand(prId?: string): Promise<void> {
     process.exit(1);
   }
 
-  const spinner = p.spinner();
+  const spinner = safeSpinner();
   spinner.start(`Approving PR #${chalk.cyan(id)}…`);
   try {
     await prSvc.votePR(id, 'approve');
@@ -76,7 +77,7 @@ export async function prVoteCommand(prId?: string): Promise<void> {
 
   const vote = choice as PRVote;
 
-  const spinner = p.spinner();
+  const spinner = safeSpinner();
   spinner.start('Submitting vote…');
   try {
     await prSvc.votePR(id, vote);

@@ -9,6 +9,7 @@ import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { ITicketService } from '../services/interfaces/ITicketService';
 import { workflowTarget } from '../utils/workflowTarget';
 import { runHook }             from '../utils/hooks';
+import { safeSpinner }         from '../utils/tty';
 
 export interface ReviewOptions {
   /** Called from an interactive TUI session. */
@@ -70,7 +71,7 @@ export async function reviewCommand(
     p.log.step(`Setting ticket ${chalk.cyan(ticketId)} to "${displayLabel}"…`);
   }
 
-  const spinner = p.spinner();
+  const spinner = safeSpinner();
   spinner.start(`Updating ticket ${chalk.cyan(ticketId)}…`);
 
   let finalLabel = displayLabel;
@@ -100,7 +101,7 @@ export async function reviewCommand(
     await cfg.setProviderField('azuredevops', 'reviewColumn', fix.column);
     finalLabel = fix.column;
 
-    const retrySpinner = p.spinner();
+    const retrySpinner = safeSpinner();
     retrySpinner.start(`Retrying with "${chalk.yellow(fix.column)}"…`);
     try {
       await ticketSvc.updateStatus(ticketId, fix.state, fix.column);

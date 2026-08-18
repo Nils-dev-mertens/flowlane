@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import { errMsg } from '../utils/errors';
 import { container }   from '../container';
 import { TOKENS }      from '../tokens';
-import { isInteractive } from '../utils/tty';
+import { isInteractive, safeSpinner } from '../utils/tty';
 import type { IPRService } from '../services/interfaces/IPRService';
 import type { PRThread }   from '../types';
 import { resolvePRId }     from '../utils/prResolve';
@@ -45,7 +45,7 @@ export async function prThreadsCommand(prId?: string, options: PrThreadsOptions 
   let threads: PRThread[];
 
   if (interactive) {
-    const spinner = p.spinner();
+    const spinner = safeSpinner();
     spinner.start(`Loading threads for PR #${chalk.cyan(id)}…`);
     try {
       threads = await prSvc.getThreads(id, activeOnly);
@@ -130,7 +130,7 @@ async function promptThreadAction(
   if (p.isCancel(action) || action === 'none') return;
 
   if (action === 'resolve') {
-    const spinner = p.spinner();
+    const spinner = safeSpinner();
     spinner.start('Resolving thread…');
     try {
       await prSvc.resolveThread(prId, threadId);
@@ -145,7 +145,7 @@ async function promptThreadAction(
   const text = await p.text({ message: 'Your reply:', placeholder: 'Type your reply…' });
   if (p.isCancel(text) || !text) return;
 
-  const spinner = p.spinner();
+  const spinner = safeSpinner();
   spinner.start('Posting reply…');
   try {
     await prSvc.replyToThread(prId, threadId, text);

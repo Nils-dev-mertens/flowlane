@@ -8,6 +8,7 @@ import { fetchBoardColumns } from '../utils/azureBoard';
 import { getAzCliToken } from '../utils/azCliAuth';
 import { resolveProviderConfig, resolveTicketProvider, resolveVcsProvider, providerDescriptor } from '../config/providers';
 import { TICKET_PROVIDERS, VCS_PROVIDERS, getProviderSpec } from '../config/providerRegistry';
+import { safeSpinner } from '../utils/tty';
 import type { FlowlaneConfig, ProviderId, TicketProvider, VcsProvider } from '../types';
 
 /** Human-readable descriptor for a profile's configured provider(s). */
@@ -214,8 +215,11 @@ async function askProviderFields(
   const block: Record<string, unknown> = {};
 
   for (const field of spec.fields) {
-    // Azure DevOps skips the token when Azure CLI authentication is selected.
-    if (provider === 'azuredevops' && field.key === 'token' && block.authMethod === 'az-cli') {
+    // Skip the token when CLI-based authentication is selected (az-cli/gh-cli).
+    const cliAuth =
+      (provider === 'azuredevops' && block.authMethod === 'az-cli') ||
+      (provider === 'github' && block.authMethod === 'gh-cli');
+    if (field.key === 'token' && cliAuth) {
       continue;
     }
 
@@ -306,7 +310,7 @@ async function askAzureBoardConfig(
 
   // ── Fetch board columns ──────────────────────────────────────────────────
 
-  const boardSpinner = p.spinner();
+  const boardSpinner = safeSpinner();
   boardSpinner.start(`Fetching board columns for "${block.team}"…`);
 
   let boardColumns: Awaited<ReturnType<typeof fetchBoardColumns>> | null = null;

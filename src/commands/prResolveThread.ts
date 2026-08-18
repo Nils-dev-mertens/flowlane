@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import { errMsg } from '../utils/errors';
 import { container }   from '../container';
 import { TOKENS }      from '../tokens';
-import { isInteractive } from '../utils/tty';
+import { isInteractive, safeSpinner } from '../utils/tty';
 import type { IPRService } from '../services/interfaces/IPRService';
 import { resolvePRId }     from '../utils/prResolve';
 
@@ -33,7 +33,7 @@ export async function prResolveThreadCommand(threadId: string, prId?: string): P
   }
 
   if (interactive) {
-    const spinner = p.spinner();
+    const spinner = safeSpinner();
     spinner.start(`Resolving thread #${chalk.cyan(tid)} on PR #${chalk.cyan(id)}…`);
     try {
       await prSvc.resolveThread(id, tid);

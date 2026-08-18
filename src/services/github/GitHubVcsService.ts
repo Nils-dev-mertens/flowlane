@@ -12,6 +12,10 @@ import type {
 } from '../../types';
 import { TOKENS } from '../../tokens';
 import { GitHubApiClient, GitHubApiError } from './GitHubApiClient';
+import { resolveGithubToken } from '../../utils/ghCliAuth';
+
+/** Status codes GitHub can return transiently (503 during PR writes, etc.). */
+const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 
 // ── GitHub API shapes ─────────────────────────────────────────────────────────
 
@@ -167,7 +171,7 @@ export class GitHubVcsService implements IPRService {
     this.owner = gh.owner;
     this.repo  = gh.repo;
     this.api   = new GitHubApiClient({
-      token:      gh.token,
+      token:      resolveGithubToken(gh.token, gh.authMethod),
       baseUrl:    gh.baseUrl,
       graphqlUrl: gh.graphqlUrl,
     });
@@ -178,31 +182,41 @@ export class GitHubVcsService implements IPRService {
   async createPR(params: CreatePRParams): Promise<PullRequest> {
     const { ticketId, title, description, sourceBranch, targetBranch } = params;
 
-    await this.ensureBranchExists(sourceBranch, 'source');
-    await this.ensureBranchExists(targetBranch, 'base');
-    await this.ensureCommitsToMerge(sourceBranch, targetBranch);
+    try {
+      await this.ensureBranchExists(sourceBranch, 'source');
+      await this.ensureBranchExists(targetBranch, 'base');
+      await this.ensureCommitsToMerge(sourceBranch, targetBranch);
 
-    const existing = await this.findPRForBranch(sourceBranch);
-    if (existing) {
-      throw new GitHubApiError(
-        `An open pull request already exists for branch "${sourceBranch}": #${existing.id} (${existing.url}).`,
-      );
+      const existing = await this.findPRForBranch(sourceBranch);
+      if (existing) {
+        throw new GitHubApiError(
+          `An open pull request already exists for branch "${sourceBranch}": #${existing.id} (${existing.url}).`,
+        );
+      }
+
+      const body = await this.api.request<{
+        number: number;
+        title: string;
+        html_url: string;
+        state: string;
+      }>('POST', this.path('/pulls'), {
+        title: ticketId ? `[${ticketId}] ${title}` : title,
+        body:  description ?? '',
+        head:  sourceBranch,
+        base:  targetBranch,
+        draft: params.isDraft ?? false,
+      });
+
+      return { id: body.number, title: body.title, url: body.html_url, status: body.state };
+    } catch (err: unknown) {
+      // A write can succeed server-side while the response is lost (GitHub 503).
+      // If the PR now exists, surface it instead of failing with a bare error.
+      if (err instanceof GitHubApiError && RETRYABLE_STATUS_CODES.has(err.status ?? 0)) {
+        const existing = await this.findPRForBranch(sourceBranch);
+        if (existing) return existing;
+      }
+      throw err;
     }
-
-    const body = await this.api.request<{
-      number: number;
-      title: string;
-      html_url: string;
-      state: string;
-    }>('POST', this.path('/pulls'), {
-      title: ticketId ? `[${ticketId}] ${title}` : title,
-      body:  description ?? '',
-      head:  sourceBranch,
-      base:  targetBranch,
-      draft: params.isDraft ?? false,
-    });
-
-    return { id: body.number, title: body.title, url: body.html_url, status: body.state };
   }
 
   async findPRForBranch(branch: string): Promise<PullRequest | null> {

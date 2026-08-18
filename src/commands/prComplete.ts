@@ -6,6 +6,7 @@ import { TOKENS }      from '../tokens';
 import type { IPRService }   from '../services/interfaces/IPRService';
 import type { MergeStrategy } from '../types';
 import { resolvePRId }        from '../utils/prResolve';
+import { safeSpinner }        from '../utils/tty';
 
 const STRATEGY_OPTIONS: Array<{ value: MergeStrategy; label: string; hint: string }> = [
   { value: 'squash',       label: 'Squash commit',       hint: 'Combine all commits into one' },
@@ -31,7 +32,7 @@ export async function prCompleteCommand(prId?: string): Promise<void> {
   }
 
   // Show PR title for context before asking strategy.
-  const fetchSpinner = p.spinner();
+  const fetchSpinner = safeSpinner();
   fetchSpinner.start(`Fetching PR #${chalk.cyan(id)}…`);
   let prTitle = `PR #${id}`;
   try {
@@ -64,7 +65,7 @@ export async function prCompleteCommand(prId?: string): Promise<void> {
     return;
   }
 
-  const spinner = p.spinner();
+  const spinner = safeSpinner();
   spinner.start('Completing pull request…');
   try {
     await prSvc.completePR(id, strategy);

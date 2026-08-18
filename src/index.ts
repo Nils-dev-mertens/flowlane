@@ -117,16 +117,16 @@ prCmd
   });
 
 prCmd
-  .command('comment <text>')
-  .description('Add a comment to the open PR for the current branch')
+  .command('comment <text> [prId]')
+  .description('Add a comment to a pull request (defaults to the open PR for the current branch)')
   .option('--file <path>', 'File path for an inline comment (e.g. src/foo.ts)')
   .option('--line <n>', 'Start line for an inline comment (1-based)', (v) => parseInt(v, 10))
   .option('--end-line <n>', 'End line for a multi-line inline comment (1-based)', (v) => parseInt(v, 10))
-  .action(async (text: string, opts: { file?: string; line?: number; endLine?: number }) => {
+  .action(async (text: string, prId: string | undefined, opts: { file?: string; line?: number; endLine?: number }) => {
     await ensureConfig();
     const { prCommentCommand } = await import('./commands/prComment');
     try {
-      await prCommentCommand(text, { file: opts.file, line: opts.line, endLine: opts.endLine });
+      await prCommentCommand(text, prId, { file: opts.file, line: opts.line, endLine: opts.endLine });
     } catch (err: unknown) {
       console.error(chalk.red(`Error: ${errMsg(err)}`));
       process.exit(1);
