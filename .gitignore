@@ -6,4 +6,5 @@ dist/
 .DS_Store
 .claude/
 .agents/
+.opencode/
 .flowlane
