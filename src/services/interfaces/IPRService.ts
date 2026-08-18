@@ -4,6 +4,7 @@ import type {
   PRThread,
   PRFile,
   PRVote,
+  PRCheckStatus,
   MergeStrategy,
   CreatePRParams,
 } from '../../types';
@@ -47,4 +48,6 @@ export interface IPRService {
   replyToThread(prId: number, threadId: number, comment: string): Promise<void>;
   /** List all files changed in a pull request (latest iteration). */
   getChangedFiles(prId: number): Promise<PRFile[]>;
+  /** CI/check status for a pull request's head commit. Returns null when the provider cannot report it. */
+  getCheckStatus(prId: number): Promise<PRCheckStatus | null>;
 }

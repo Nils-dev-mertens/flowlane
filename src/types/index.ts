@@ -172,6 +172,8 @@ export interface FlowlaneConfig {
   hookAfterStart?: string;
   /** Shell command to run after a PR comment is posted. Supports {{prId}}, {{branch}}. */
   hookAfterComment?: string;
+  /** Command used to open files/diffs in an editor (e.g. `code`). Defaults to `code`. */
+  editor?: string;
 }
 
 /** Vote options for a pull request reviewer. */
@@ -179,6 +181,17 @@ export type PRVote = 'approve' | 'approve-with-suggestions' | 'wait' | 'reject' 
 
 /** Merge strategy when completing a pull request. */
 export type MergeStrategy = 'squash' | 'merge' | 'rebase' | 'rebase-merge';
+
+/** Aggregate state of the CI checks that apply to a pull request head commit. */
+export type PRCheckState = 'success' | 'failure' | 'pending' | 'error' | 'neutral' | 'unknown';
+
+/** CI/check status for a pull request. */
+export interface PRCheckStatus {
+  /** Aggregated status across all evaluated checks. */
+  state: PRCheckState;
+  /** Total number of checks evaluated on the head commit. */
+  total: number;
+}
 
 /** Summary of a pull request returned by the list command. */
 export interface PRSummary {
@@ -198,6 +211,8 @@ export interface PRSummary {
     email: string;
     vote: number;
   }>;
+  /** CI check status for the PR head commit, when the provider can report it. */
+  checks?: PRCheckStatus;
 }
 
 /** A single comment thread on a pull request. */
@@ -228,6 +243,12 @@ export interface PRFile {
   changeType: 'add' | 'edit' | 'delete' | 'rename' | 'other';
   /** Original path before rename, if applicable. */
   originalPath?: string;
+  /** Unified diff patch provided by the VCS provider (when available). */
+  patch?: string;
+  /** Lines added in the new file version. */
+  additions?: number;
+  /** Lines deleted from the old file version. */
+  deletions?: number;
 }
 
 export interface CreatePRParams {

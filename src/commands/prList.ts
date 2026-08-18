@@ -7,7 +7,7 @@ import { isInteractive, safeSpinner } from '../utils/tty';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { IPRService }     from '../services/interfaces/IPRService';
 import type { PRSummary }      from '../types';
-import { formatAge, formatReviewers } from '../utils/prDisplay';
+import { formatAge, formatChecks, formatReviewers } from '../utils/prDisplay';
 
 export interface PrListOptions {
   /** Output as JSON. */
@@ -107,10 +107,12 @@ function printPR(pr: PRSummary, _context: 'mine' | 'review' | 'other'): void {
   const title  = pr.title.length > 55 ? pr.title.slice(0, 54) + '…' : pr.title;
   const branch = chalk.dim(`${pr.sourceBranch} → ${pr.targetBranch}`);
   const votes  = formatReviewers(pr.reviewers);
+  const checks = pr.checks ? formatChecks(pr.checks) : '';
 
   console.log(
     `\n  ${chalk.cyan(`#${String(pr.id).padEnd(6)}`)}${chalk.bold(title)}${draft}  ${chalk.dim(age)}`,
   );
   console.log(`           ${branch}`);
   if (votes) console.log(`           ${votes}`);
+  if (checks) console.log(`           ${checks}`);
 }

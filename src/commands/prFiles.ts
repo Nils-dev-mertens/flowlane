@@ -5,9 +5,11 @@ import { container }      from '../container';
 import { TOKENS }         from '../tokens';
 import { isInteractive, safeSpinner }  from '../utils/tty';
 import type { IPRService } from '../services/interfaces/IPRService';
+import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { PRFile, PRSummary } from '../types';
 import { resolvePRId }    from '../utils/prResolve';
 import { changeTypeBadge, showDiff } from '../utils/prDisplay';
+import { openDiffInEditor } from '../utils/openInEditor';
 
 export interface PrFilesOptions {
   json?: boolean;
@@ -82,7 +84,10 @@ export async function prFilesCommand(prId?: string, options: PrFilesOptions = {}
 
   printFileList(files);
 
-  // Interactive loop — user picks a file, views diff, optionally comments.
+  const cfg = container.resolve<IConfigService>(TOKENS.ConfigService);
+
+  // Interactive loop — user picks a file, views the diff (terminal or editor),
+  // optionally comments, then returns to the list to pick the next file.
   while (true) {
     const choices = [
       ...files.map(f => ({
@@ -101,19 +106,32 @@ export async function prFilesCommand(prId?: string, options: PrFilesOptions = {}
     if (p.isCancel(selected) || selected === '__done__') break;
 
     const file = files.find(f => f.path === selected)!;
-    showDiff(file, pr);
 
-    // Offer to comment on this file.
-    const wantComment = await p.confirm({
-      message: `Add a comment on ${chalk.cyan(file.path)}?`,
-      initialValue: false,
+    const action = await p.select({
+      message: `What would you like to do with ${chalk.cyan(file.path)}?`,
+      options: [
+        { value: 'diff',    label: 'View diff',      hint: 'print the diff in the terminal' },
+        { value: 'editor',  label: 'Open in editor', hint: 'open the diff in your IDE' },
+        { value: 'comment', label: 'Add comment',    hint: 'leave inline feedback' },
+        { value: 'back',    label: chalk.dim('Back to file list') },
+      ],
     });
 
-    if (p.isCancel(wantComment)) break;
+    if (p.isCancel(action) || action === 'back') continue;
 
-    if (wantComment) {
-      await postComment(prSvc, id, file);
+    if (action === 'diff') {
+      showDiff(file, pr);
+      continue;
     }
+
+    if (action === 'editor') {
+      const editor = cfg.get<string>('editor') ?? 'code';
+      if (pr) openDiffInEditor(file, pr, { command: editor });
+      else console.log(chalk.dim('  (no PR summary available to resolve branches.)'));
+      continue;
+    }
+
+    await postComment(prSvc, id, file);
   }
 
   p.outro(chalk.dim('Review session ended.'));

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { changeTypeBadge, formatAge, formatReviewers, wrapText } from '../../src/utils/prDisplay';
+import { changeTypeBadge, formatAge, formatChecks, formatReviewers, wrapText } from '../../src/utils/prDisplay';
 
 test('wrapText leaves short lines untouched', () => {
   assert.deepEqual(wrapText('short line', 20), ['short line']);
@@ -48,4 +48,20 @@ test('formatReviewers maps votes to badges and shortens names', () => {
 
 test('formatReviewers returns an empty string when there are no reviewers', () => {
   assert.equal(formatReviewers([]), '');
+});
+
+test('formatChecks renders a passing badge', () => {
+  const out = formatChecks({ state: 'success', total: 3 });
+  assert.ok(out.includes('3 checks'));
+  assert.ok(out.includes('passing'));
+});
+
+test('formatChecks renders a failing badge', () => {
+  const out = formatChecks({ state: 'failure', total: 1 });
+  assert.ok(out.includes('1 check'));
+  assert.ok(out.includes('failing'));
+});
+
+test('formatChecks renders a pending badge', () => {
+  assert.ok(formatChecks({ state: 'pending', total: 2 }).includes('pending'));
 });

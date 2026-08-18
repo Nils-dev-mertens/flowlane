@@ -16,6 +16,7 @@ import type {
 } from '../types';
 import { resolvePRId } from '../utils/prResolve';
 import { printThread, changeTypeBadge, showDiff, formatReviewers } from '../utils/prDisplay';
+import { openDiffInEditor } from '../utils/openInEditor';
 
 export interface PrReviewOptions {
   /** Output the PR summary, threads, and files as JSON and exit (no session). */
@@ -309,6 +310,8 @@ async function reviewFiles(prSvc: IPRService, prId: number, summary?: PRSummary)
     return;
   }
 
+  const cfg = container.resolve<IConfigService>(TOKENS.ConfigService);
+
   for (;;) {
     const selected = await p.select({
       message: 'Select a file to review:',
@@ -325,14 +328,33 @@ async function reviewFiles(prSvc: IPRService, prId: number, summary?: PRSummary)
     if (p.isCancel(selected) || selected === '__back__') return;
 
     const file = files.find((f) => f.path === selected)!;
-    showDiff(file, summary);
 
-    const wantComment = await p.confirm({
-      message: `Add a comment on ${chalk.cyan(file.path)}?`,
-      initialValue: false,
+    // File action menu — keeps the loop flowing back to the list.
+    const action = await p.select({
+      message: `What would you like to do with ${chalk.cyan(file.path)}?`,
+      options: [
+        { value: 'diff',    label: 'View diff',        hint: 'print the diff in the terminal' },
+        { value: 'editor',  label: 'Open in editor',   hint: 'open the diff in your IDE' },
+        { value: 'comment', label: 'Add comment',      hint: 'leave inline feedback' },
+        { value: 'back',    label: chalk.dim('Back to file list') },
+      ],
     });
-    if (p.isCancel(wantComment)) return;
-    if (wantComment) await postComment(prSvc, prId, file);
+
+    if (p.isCancel(action) || action === 'back') continue;
+
+    if (action === 'diff') {
+      showDiff(file, summary);
+      continue;
+    }
+
+    if (action === 'editor') {
+      const editor = cfg.get<string>('editor') ?? 'code';
+      if (summary) openDiffInEditor(file, summary, { command: editor });
+      else console.log(chalk.dim('  (no PR summary available to resolve branches.)'));
+      continue;
+    }
+
+    await postComment(prSvc, prId, file);
   }
 }
 

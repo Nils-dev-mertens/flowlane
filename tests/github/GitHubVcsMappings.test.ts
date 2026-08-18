@@ -201,13 +201,13 @@ test('GitHubVcsService reports an unpublished source branch before creating a PR
   }
 });
 
-test('GitHubVcsService maps changed-file statuses', async () => {
+test('GitHubVcsService maps changed-file statuses and diffs', async () => {
   globalThis.fetch = async (input) => {
     assert.equal(String(input), 'https://api.github.com/repos/me/demo/pulls/42/files?per_page=100&page=1');
     return response([
-      { filename: 'new.ts', status: 'added' },
-      { filename: 'old.ts', status: 'removed' },
-      { filename: 'edit.ts', status: 'modified' },
+      { filename: 'new.ts', status: 'added', patch: '@@ -0,0 +1,2 @@\n+line\n', additions: 2, deletions: 0 },
+      { filename: 'old.ts', status: 'removed', patch: '@@ -1,2 +0,0 @@\n-line\n', additions: 0, deletions: 2 },
+      { filename: 'edit.ts', status: 'modified', patch: '@@ -1,1 +1,1 @@\n-a\n+b\n', additions: 1, deletions: 1 },
       { filename: 'renamed.ts', status: 'renamed', previous_filename: 'before.ts' },
     ]);
   };
@@ -216,10 +216,10 @@ test('GitHubVcsService maps changed-file statuses', async () => {
     const service = new GitHubVcsService(makeConfig());
     const files = await service.getChangedFiles(42);
     assert.deepEqual(files, [
-      { path: 'new.ts', changeType: 'add', originalPath: undefined },
-      { path: 'old.ts', changeType: 'delete', originalPath: undefined },
-      { path: 'edit.ts', changeType: 'edit', originalPath: undefined },
-      { path: 'renamed.ts', changeType: 'rename', originalPath: 'before.ts' },
+      { path: 'new.ts', changeType: 'add', originalPath: undefined, patch: '@@ -0,0 +1,2 @@\n+line\n', additions: 2, deletions: 0 },
+      { path: 'old.ts', changeType: 'delete', originalPath: undefined, patch: '@@ -1,2 +0,0 @@\n-line\n', additions: 0, deletions: 2 },
+      { path: 'edit.ts', changeType: 'edit', originalPath: undefined, patch: '@@ -1,1 +1,1 @@\n-a\n+b\n', additions: 1, deletions: 1 },
+      { path: 'renamed.ts', changeType: 'rename', originalPath: 'before.ts', patch: undefined, additions: undefined, deletions: undefined },
     ]);
   } finally {
     globalThis.fetch = originalFetch;
@@ -245,10 +245,12 @@ test('GitHubVcsService batches review fetching via GraphQL in listPRs', async ()
                 {
                   number: 1,
                   reviews: { nodes: [{ author: { login: 'alice' }, state: 'APPROVED' }] },
+                  statusCheckRollup: { state: 'SUCCESS', count: 3 },
                 },
                 {
                   number: 2,
                   reviews: { nodes: [{ author: { login: 'bob' }, state: 'CHANGES_REQUESTED' }] },
+                  statusCheckRollup: { state: 'FAILURE', count: 2 },
                 },
               ],
             },
@@ -303,8 +305,75 @@ test('GitHubVcsService batches review fetching via GraphQL in listPRs', async ()
     assert.equal(prs.length, 2);
     assert.deepEqual(prs[0].reviewers, [{ name: 'alice', email: 'alice', vote: 10 }]);
     assert.deepEqual(prs[1].reviewers, [{ name: 'bob', email: 'bob', vote: -10 }]);
+    assert.deepEqual(prs[0].checks, { state: 'success', total: 3 });
+    assert.deepEqual(prs[1].checks, { state: 'failure', total: 2 });
     assert.equal(graphqlCalls, 1);
     assert.equal(reviewRESTCalls, 0); // no per-PR REST fan-out when authenticated
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('GitHubVcsService resolves check status for a single PR via GraphQL rollup', async () => {
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    const parsed = new URL(url);
+
+    if (parsed.pathname.endsWith('/pulls/7')) {
+      return response({ head: { sha: 'sha7' } });
+    }
+    if (parsed.pathname === '/graphql') {
+      const body = JSON.parse(String(init?.body)) as { query: string };
+      assert.ok(body.query.includes('query CheckRollup'));
+      return response({
+        data: {
+          repository: {
+            pullRequest: {
+              statusCheckRollup: [{ state: 'PENDING', count: 4 }],
+            },
+          },
+        },
+      });
+    }
+    throw new Error(`Unexpected mocked GitHub request: ${url}`);
+  };
+
+  try {
+    const service = new GitHubVcsService(makeConfig());
+    const status = await service.getCheckStatus(7);
+    assert.deepEqual(status, { state: 'pending', total: 4 });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('GitHubVcsService falls back to REST combined status when GraphQL is unavailable', async () => {
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    const parsed = new URL(url);
+
+    if (parsed.pathname.endsWith('/pulls/7')) {
+      return response({ head: { sha: 'sha7' } });
+    }
+    if (parsed.pathname === '/graphql') {
+      const body = JSON.parse(String(init?.body)) as { query: string };
+      if (body.query.includes('query CheckRollup')) {
+        return new Response(JSON.stringify({ message: 'boom' }), {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+    }
+    if (parsed.pathname.endsWith('/commits/sha7/status')) {
+      return response({ state: 'success', total_count: 2 });
+    }
+    throw new Error(`Unexpected mocked GitHub request: ${url}`);
+  };
+
+  try {
+    const service = new GitHubVcsService(makeConfig());
+    const status = await service.getCheckStatus(7);
+    assert.deepEqual(status, { state: 'success', total: 2 });
   } finally {
     globalThis.fetch = originalFetch;
   }

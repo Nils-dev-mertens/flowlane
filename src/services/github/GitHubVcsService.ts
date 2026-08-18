@@ -7,6 +7,7 @@ import type {
   PRThread,
   PRFile,
   PRVote,
+  PRCheckStatus,
   MergeStrategy,
   CreatePRParams,
 } from '../../types';
@@ -47,6 +48,10 @@ interface GHOpenPRReviewsData {
         reviews?: {
           nodes?: Array<{ author?: { login?: string } | null; state: GHReview['state'] }>;
         };
+        statusCheckRollup?: {
+          state: 'EXPECTED' | 'ERROR' | 'FAILURE' | 'PENDING' | 'SUCCESS';
+          count: number;
+        } | null;
       }>;
     };
   };
@@ -60,6 +65,10 @@ const OPEN_PR_REVIEWS_QUERY = `
           number
           reviews(last: 100) {
             nodes { author { login } state }
+          }
+          statusCheckRollup {
+            state
+            count
           }
         }
       }
@@ -91,6 +100,9 @@ interface GHPullFile {
   filename: string;
   status: 'added' | 'removed' | 'modified' | 'renamed' | 'copied' | 'changed' | 'unchanged';
   previous_filename?: string;
+  patch?: string;
+  additions?: number;
+  deletions?: number;
 }
 
 interface GHReviewThreadNode {
@@ -153,6 +165,19 @@ const RESOLVE_REVIEW_THREAD_MUTATION = `
       thread {
         id
         isResolved
+      }
+    }
+  }
+`;
+
+const CHECK_ROLLUP_QUERY = `
+  query CheckRollup($owner: String!, $repo: String!, $number: Int!) {
+    repository(owner: $owner, name: $repo) {
+      pullRequest(number: $number) {
+        statusCheckRollup {
+          state
+          count
+        }
       }
     }
   }
@@ -276,7 +301,7 @@ export class GitHubVcsService implements IPRService {
       this.path('/pulls?state=open'),
     );
 
-    const reviewsByPr = await this.fetchReviewsByPr(prs);
+    const { reviewsByPr, checksByPr } = await this.fetchReviewsAndChecks(prs);
 
     return prs.map((pr) => ({
       id:           pr.number,
@@ -289,17 +314,22 @@ export class GitHubVcsService implements IPRService {
       isDraft:      pr.draft,
       createdAt:    new Date(pr.created_at),
       reviewers:    this.buildReviewers(pr.requested_reviewers ?? [], reviewsByPr.get(pr.number) ?? []),
+      checks:       checksByPr.get(pr.number),
     }));
   }
 
   /**
-   * Fetch the latest reviews for every open PR. With a token this is a single
-   * GraphQL call (avoiding an N+1 REST fan-out); without one it degrades to
-   * per-PR REST requests, best-effort.
+   * Fetch the latest reviews and CI check rollups for every open PR.
+   * With a token this is a single GraphQL call (avoiding an N+1 REST fan-out);
+   * without one it degrades to per-PR REST requests, best-effort.
    */
-  private async fetchReviewsByPr(prs: GHPullRequest[]): Promise<Map<number, GHReview[]>> {
-    const map = new Map<number, GHReview[]>();
-    if (prs.length === 0) return map;
+  private async fetchReviewsAndChecks(prs: GHPullRequest[]): Promise<{
+    reviewsByPr: Map<number, GHReview[]>;
+    checksByPr: Map<number, PRCheckStatus | undefined>;
+  }> {
+    const reviewsByPr = new Map<number, GHReview[]>();
+    const checksByPr = new Map<number, PRCheckStatus | undefined>();
+    if (prs.length === 0) return { reviewsByPr, checksByPr };
 
     if (this.api.hasToken) {
       try {
@@ -309,28 +339,81 @@ export class GitHubVcsService implements IPRService {
           first: Math.min(prs.length, 100),
         });
         for (const node of data.repository?.pullRequests?.nodes ?? []) {
-          map.set(node.number, (node.reviews?.nodes ?? [])
+          reviewsByPr.set(node.number, (node.reviews?.nodes ?? [])
             .filter((r) => r.author?.login)
             .map((r) => ({
               id:    0,
               user:  { login: r.author!.login! },
               state: r.state,
             })));
+          const rollup = node.statusCheckRollup;
+          checksByPr.set(node.number, rollup ? mapRollupState(rollup.state, rollup.count) : undefined);
         }
-        return map;
+        return { reviewsByPr, checksByPr };
       } catch {
         // GraphQL may be unavailable (Enterprise, permissions) — fall through.
       }
     }
 
-    const settled = await Promise.allSettled(
+    const reviewsSettled = await Promise.allSettled(
       prs.map((pr) => this.api.getPaginated<GHReview>(this.path(`/pulls/${pr.number}/reviews`))),
     );
+    const checksSettled = await Promise.allSettled(
+      prs.map((pr) => this.api.request<{ state: string; total_count: number }>(
+        'GET',
+        this.path(`/commits/${pr.head.sha}/status`),
+      )),
+    );
     prs.forEach((pr, i) => {
-      const result = settled[i];
-      if (result.status === 'fulfilled') map.set(pr.number, result.value);
+      const reviewResult = reviewsSettled[i];
+      if (reviewResult.status === 'fulfilled') reviewsByPr.set(pr.number, reviewResult.value);
+      const checkResult = checksSettled[i];
+      if (checkResult.status === 'fulfilled') {
+        checksByPr.set(pr.number, mapCombinedState(checkResult.value.state, checkResult.value.total_count));
+      }
     });
-    return map;
+    return { reviewsByPr, checksByPr };
+  }
+
+  async getCheckStatus(prId: number): Promise<PRCheckStatus | null> {
+    if (this.api.hasToken) {
+      try {
+        const pr = await this.api.request<{ head: { sha: string } }>(
+          'GET',
+          this.path(`/pulls/${prId}`),
+        );
+        const rollup = await this.api.graphql<{
+          repository: {
+            pullRequest: {
+              statusCheckRollup: { state: string; count: number }[] | null;
+            } | null;
+          } | null;
+        }>(CHECK_ROLLUP_QUERY, { owner: this.owner, repo: this.repo, number: prId });
+        const latest = rollup.repository?.pullRequest?.statusCheckRollup;
+        if (latest && latest.length > 0) {
+          return mapRollupState(
+            latest[0].state as 'EXPECTED' | 'ERROR' | 'FAILURE' | 'PENDING' | 'SUCCESS',
+            latest[0].count,
+          );
+        }
+      } catch {
+        // Fall through to REST combined status.
+      }
+    }
+
+    try {
+      const pr = await this.api.request<{ head: { sha: string } }>(
+        'GET',
+        this.path(`/pulls/${prId}`),
+      );
+      const combined = await this.api.request<{ state: string; total_count: number }>(
+        'GET',
+        this.path(`/commits/${pr.head.sha}/status`),
+      );
+      return mapCombinedState(combined.state, combined.total_count);
+    } catch {
+      return null;
+    }
   }
 
   async getPR(prId: number): Promise<PullRequest> {
@@ -516,6 +599,9 @@ export class GitHubVcsService implements IPRService {
       path:         file.filename,
       changeType:   this.mapFileStatus(file.status),
       originalPath: file.previous_filename,
+      patch:        file.patch,
+      additions:    file.additions,
+      deletions:    file.deletions,
     }));
   }
 
@@ -622,5 +708,31 @@ export class GitHubVcsService implements IPRService {
     if (status === 'modified') return 'edit';
     if (status === 'renamed')  return 'rename';
     return 'other';
+  }
+}
+
+/** Map a GitHub statusCheckRollup state to a neutral PRCheckState. */
+function mapRollupState(
+  state: 'EXPECTED' | 'ERROR' | 'FAILURE' | 'PENDING' | 'SUCCESS',
+  total: number,
+): PRCheckStatus {
+  switch (state) {
+    case 'SUCCESS': return { state: 'success', total };
+    case 'FAILURE': return { state: 'failure', total };
+    case 'ERROR':   return { state: 'error', total };
+    case 'PENDING': return { state: 'pending', total };
+    case 'EXPECTED': return { state: 'pending', total };
+    default:        return { state: 'unknown', total };
+  }
+}
+
+/** Map a GitHub combined-status string to a neutral PRCheckState. */
+function mapCombinedState(state: string, total: number): PRCheckStatus {
+  switch (state) {
+    case 'success': return { state: 'success', total };
+    case 'failure': return { state: 'failure', total };
+    case 'pending': return { state: 'pending', total };
+    case 'error':   return { state: 'error', total };
+    default:        return { state: 'unknown', total };
   }
 }

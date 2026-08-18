@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { execSync } from 'child_process';
-import type { PRFile, PRSummary, PRThread } from '../types';
+import type { PRCheckStatus, PRFile, PRSummary, PRThread } from '../types';
 
 /** Print a comment thread with a stable index label and its comments. */
 export function printThread(thread: PRThread, index: number): void {
@@ -69,6 +69,20 @@ export function formatReviewers(reviewers: PRSummary['reviewers']): string {
   }).join(chalk.dim('  ·  '));
 }
 
+/** Format a CI check status as a compact, colorized badge. */
+export function formatChecks(checks: PRCheckStatus): string {
+  const { state, total } = checks;
+  const label = `${total} check${total !== 1 ? 's' : ''}`;
+  switch (state) {
+    case 'success': return chalk.green(`✓ ${label} passing`);
+    case 'failure': return chalk.red(`✗ ${label} failing`);
+    case 'pending': return chalk.yellow(`… ${label} pending`);
+    case 'error':   return chalk.red(`! ${label} errored`);
+    case 'neutral': return chalk.dim(`○ ${label}`);
+    default:        return chalk.dim(`${label} unknown`);
+  }
+}
+
 /** Color badge for a file change type. */
 export function changeTypeBadge(type: PRFile['changeType']): string {
   switch (type) {
@@ -80,10 +94,15 @@ export function changeTypeBadge(type: PRFile['changeType']): string {
   }
 }
 
-/** Print a colorized diff for a changed file, falling back to local git. */
+/** Print a colorized diff for a changed file, preferring the provider patch and falling back to local git. */
 export function showDiff(file: PRFile, pr?: PRSummary): void {
   if (file.changeType === 'delete') {
     console.log(`\n  ${chalk.red('File was deleted.')} No diff to show.\n`);
+    return;
+  }
+
+  if (file.patch) {
+    printPatch(file.path, file.patch);
     return;
   }
 
@@ -107,10 +126,16 @@ export function showDiff(file: PRFile, pr?: PRSummary): void {
     return;
   }
 
-  console.log(`\n  ${chalk.bold(file.path)}`);
+  printPatch(file.path, diff);
+  console.log('');
+}
+
+/** Print a unified diff with the standard color coding. */
+function printPatch(filePath: string, patch: string): void {
+  console.log(`\n  ${chalk.bold(filePath)}`);
   console.log('  ' + chalk.dim('─'.repeat(60)));
 
-  for (const line of diff.split('\n')) {
+  for (const line of patch.split('\n')) {
     if (line.startsWith('+++') || line.startsWith('---')) {
       console.log('  ' + chalk.dim(line));
     } else if (line.startsWith('+')) {

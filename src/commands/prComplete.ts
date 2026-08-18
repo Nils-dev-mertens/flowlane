@@ -4,9 +4,10 @@ import { errMsg } from '../utils/errors';
 import { container }   from '../container';
 import { TOKENS }      from '../tokens';
 import type { IPRService }   from '../services/interfaces/IPRService';
-import type { MergeStrategy } from '../types';
+import type { MergeStrategy, PRCheckStatus } from '../types';
 import { resolvePRId }        from '../utils/prResolve';
 import { safeSpinner }        from '../utils/tty';
+import { formatChecks }       from '../utils/prDisplay';
 
 const STRATEGY_OPTIONS: Array<{ value: MergeStrategy; label: string; hint: string }> = [
   { value: 'squash',       label: 'Squash commit',       hint: 'Combine all commits into one' },
@@ -55,6 +56,11 @@ export async function prCompleteCommand(prId?: string): Promise<void> {
 
   const strategy = picked as MergeStrategy;
 
+  const checkStatus = await loadCheckStatus(prSvc, id);
+  if (checkStatus && (checkStatus.state === 'failure' || checkStatus.state === 'error')) {
+    p.log.warn(`${chalk.red('Checks are failing:')} ${formatChecks(checkStatus)}`);
+  }
+
   const confirmed = await p.confirm({
     message: `Complete PR #${chalk.cyan(id)} using ${chalk.yellow(strategy)}?`,
     initialValue: true,
@@ -76,4 +82,18 @@ export async function prCompleteCommand(prId?: string): Promise<void> {
   }
 
   p.outro(chalk.green('Done.'));
+}
+
+/** Fetch CI check status, tolerating providers that cannot report it. */
+async function loadCheckStatus(prSvc: IPRService, prId: number): Promise<PRCheckStatus | null> {
+  const spinner = safeSpinner();
+  spinner.start('Checking CI status…');
+  try {
+    const status = await prSvc.getCheckStatus(prId);
+    spinner.stop(status ? formatChecks(status) : chalk.dim('No check status available.'));
+    return status;
+  } catch (err: unknown) {
+    spinner.stop(chalk.dim('Could not fetch check status.'));
+    return null;
+  }
 }

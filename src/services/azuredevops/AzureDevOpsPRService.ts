@@ -2,6 +2,7 @@ import { injectable, inject } from 'tsyringe';
 import * as azdev from 'azure-devops-node-api';
 import type { IGitApi } from 'azure-devops-node-api/GitApi';
 import type { GitPullRequest, CommentThreadStatus } from 'azure-devops-node-api/interfaces/GitInterfaces';
+import { GitStatusState } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import type { IPRService, CommentOptions } from '../interfaces/IPRService';
 import type { IConfigService } from '../interfaces/IConfigService';
 import type {
@@ -10,6 +11,7 @@ import type {
   PRThread,
   PRFile,
   PRVote,
+  PRCheckStatus,
   MergeStrategy,
   CreatePRParams,
 } from '../../types';
@@ -285,6 +287,28 @@ export class AzureDevOpsPRService implements IPRService {
         changeType:   mapChangeType(c.changeType ?? 0),
         originalPath: c.originalPath?.replace(/^\//, '') ?? undefined,
       }));
+  }
+
+  async getCheckStatus(prId: number): Promise<PRCheckStatus | null> {
+    const api = await this.api();
+    try {
+      // Pull request statuses aggregate policy/build evaluation results.
+      const statuses = await api.getPullRequestStatuses(this.repo, prId, this.project);
+      if (!statuses.length) return null;
+
+      const total = statuses.length;
+      const failed    = statuses.filter(s => s.state === GitStatusState.Failed).length;
+      const errored   = statuses.filter(s => s.state === GitStatusState.Error).length;
+      const pending   = statuses.filter(s => s.state === GitStatusState.Pending).length;
+      const notSet    = statuses.filter(s => s.state === GitStatusState.NotSet).length;
+
+      if (failed > 0) return { state: 'failure', total };
+      if (errored > 0) return { state: 'error', total };
+      if (pending > 0 || notSet > 0) return { state: 'pending', total };
+      return { state: 'success', total };
+    } catch {
+      return null;
+    }
   }
 
   // ── helpers ────────────────────────────────────────────────────────────────

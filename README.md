@@ -182,7 +182,7 @@ flowlane pr comment "This whole block should be simplified" \
 
 ### `flowlane pr review [prId]`
 
-Interactive review session that stays open across actions. Resolves the PR from an explicit ID, the current branch, or a picker, then shows a compact summary and a repeatable menu: view threads (reply/resolve), review files (view diffs, post inline comments), add a comment, submit a review vote, publish a draft, complete/merge, abandon, or open in the browser.
+Interactive review session that stays open across actions. Resolves the PR from an explicit ID, the current branch, or a picker, then shows a compact summary and a repeatable menu: view threads (reply/resolve), review files (view diffs in the terminal or open them in your editor, post inline comments), add a comment, submit a review vote, publish a draft, complete/merge, abandon, or open in the browser.
 
 ```bash
 flowlane pr review
@@ -190,13 +190,15 @@ flowlane pr review 42
 flowlane pr review 42 --json    # outputs { pr, threads, files } and exits
 ```
 
+Reviewing files follows a loop: pick a file, choose an action (view the diff in the terminal, open the diff in your editor, or leave an inline comment), then the list returns so you can pick the next file. Opening a diff in the editor materializes the base and head versions from the remote refs into temp files and runs the editor's `--diff` mode, so it works even for PRs you have not checked out.
+
 The granular `pr threads`, `pr files`, `pr comment`, `pr vote`, `pr approve`, `pr complete`, `pr abandon`, and `pr publish` commands remain available for scripting.
 
 ---
 
 ### `flowlane pr list`
 
-Lists active pull requests grouped into yours, waiting for your review, and other.
+Lists active pull requests grouped into yours, waiting for your review, and other. When the provider reports CI status, each PR shows a passing/failing/pending check badge.
 
 ```bash
 flowlane pr list
@@ -235,7 +237,7 @@ For GitHub, inline review-thread status and resolution use the GraphQL API and t
 
 ### `flowlane pr files [prId]`
 
-Interactive file-by-file PR review — shows changed files, lets you view diffs and post inline comments. In non-interactive mode (piped or `--json`) it just lists the changed files.
+Interactive file-by-file PR review — shows changed files, lets you view diffs in the terminal or open them in your editor, and post inline comments. In non-interactive mode (piped or `--json`) it just lists the changed files (including the provider-supplied `patch` when available).
 
 ```bash
 flowlane pr files
@@ -250,7 +252,7 @@ flowlane pr files 42 --json        # outputs PRFile[] array
 ```bash
 flowlane pr vote 42        # interactive vote picker
 flowlane pr approve 42     # approve immediately
-flowlane pr complete 42    # merge with strategy picker
+flowlane pr complete 42    # merge with strategy picker (warns when CI checks are failing)
 flowlane pr abandon 42     # close without merging
 flowlane pr publish 42     # mark draft as ready for review
 flowlane pr open 42        # open in browser
@@ -409,6 +411,7 @@ These live under the `azuredevops` block (or use the legacy flat keys, which aut
 | `reviewStatus` | `System.State` set when moving to review (e.g. `Active`) |
 | `reviewColumn` | Board column set when moving to review (e.g. `Ready for Review`) |
 | `closedStates` | Comma-separated states excluded from the ticket list. Defaults to `Done,Removed,Closed,Resolved` |
+| `editor` | Command used to open PR diffs in an editor (e.g. `code`). Defaults to `code` |
 
 ### Post-action hooks
 
