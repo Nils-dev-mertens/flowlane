@@ -95,3 +95,89 @@ test('GitHubApiClient includes GitHub validation details in API errors', async (
     globalThis.fetch = originalFetch;
   }
 });
+
+test('GitHubApiClient retries transient 503 responses with backoff', async () => {
+  const calls: string[] = [];
+  let attempt = 0;
+  globalThis.fetch = async () => {
+    attempt += 1;
+    calls.push(`attempt-${attempt}`);
+    if (attempt < 3) {
+      return new Response(JSON.stringify({ message: 'No server is currently available' }), {
+        status: 503,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ id: 42 }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  try {
+    const client = new GitHubApiClient({
+      token: 'test-token',
+      retryDelayMs: 1,
+      maxRetries: 3,
+    });
+    const result = await client.request<{ id: number }>('GET', '/repos/me/demo/pulls/42');
+    assert.equal(result.id, 42);
+    assert.equal(calls.length, 3);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('GitHubApiClient honors Retry-After and gives up after max retries', async () => {
+  let attempt = 0;
+  globalThis.fetch = async () => {
+    attempt += 1;
+    return new Response(JSON.stringify({ message: 'Server unavailable' }), {
+      status: 503,
+      headers: {
+        'content-type': 'application/json',
+        'retry-after': '0',
+      },
+    });
+  };
+
+  try {
+    const client = new GitHubApiClient({
+      token: 'test-token',
+      retryDelayMs: 1,
+      maxRetries: 2,
+    });
+    await assert.rejects(
+      client.request('GET', '/repos/me/demo/pulls/42'),
+      (error: unknown) =>
+        error instanceof GitHubApiError &&
+        error.status === 503 &&
+        error.message.includes('GitHub API error 503'),
+    );
+    assert.equal(attempt, 3);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('GitHubApiClient does not retry non-transient errors', async () => {
+  let attempt = 0;
+  globalThis.fetch = async () => {
+    attempt += 1;
+    return new Response(JSON.stringify({ message: 'Validation Failed' }), {
+      status: 422,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  try {
+    const client = new GitHubApiClient({ token: 'test-token', maxRetries: 3 });
+    await assert.rejects(
+      client.request('GET', '/repos/me/demo/pulls'),
+      (error: unknown) => error instanceof GitHubApiError && error.status === 422,
+    );
+    assert.equal(attempt, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

@@ -210,3 +210,58 @@ test('GitHubVcsService replies to an inline thread via the review-comments endpo
     globalThis.fetch = originalFetch;
   }
 });
+
+test('GitHubVcsService surfaces an existing PR when PR creation 503s after the write', async () => {
+  let postAttempts = 0;
+
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    const path = new URL(url).pathname;
+
+    // Branch existence + commit-ahead checks for the create flow.
+    if (method === 'GET' && path.endsWith('/branches/feature-1')) {
+      return response({ name: 'feature-1', commit: { sha: 'abc' } });
+    }
+    if (method === 'GET' && path.endsWith('/branches/main')) {
+      return response({ name: 'main', commit: { sha: 'def' } });
+    }
+    if (method === 'GET' && path.includes('/compare/main...feature-1')) {
+      return response({ ahead_by: 3 });
+    }
+    if (method === 'GET' && path.endsWith('/pulls')) {
+      // findPRForBranch: first call (before create) finds nothing; after the
+      // failed POST the PR now exists.
+      const hasExisting = postAttempts > 0;
+      return hasExisting
+        ? response([{ number: 50, title: '[1] Existing PR', html_url: 'https://github.com/me/demo/pull/50', state: 'open', user: { login: 'me' }, head: { ref: 'feature-1', sha: 'abc' }, base: { ref: 'main' }, draft: false, created_at: '2026-08-14T10:00:00Z' }])
+        : response([]);
+    }
+    if (method === 'POST' && path.endsWith('/pulls')) {
+      postAttempts += 1;
+      return new Response(JSON.stringify({ message: 'No server is currently available' }), {
+        status: 503,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    throw new Error(`Unexpected mocked GitHub request: ${url}`);
+  };
+
+  try {
+    const service = new GitHubVcsService(makeConfig());
+    const pr = await service.createPR({
+      ticketId: '1',
+      title: 'Existing PR',
+      description: 'desc',
+      sourceBranch: 'feature-1',
+      targetBranch: 'main',
+      isDraft: false,
+    });
+
+    assert.ok(postAttempts >= 1);
+    assert.equal(pr.id, 50);
+    assert.equal(pr.url, 'https://github.com/me/demo/pull/50');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

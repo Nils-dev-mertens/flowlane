@@ -8,6 +8,7 @@ import { fetchBoardColumns } from '../utils/azureBoard';
 import { getAzCliToken } from '../utils/azCliAuth';
 import { resolveProviderConfig, resolveTicketProvider, resolveVcsProvider, providerDescriptor } from '../config/providers';
 import { TICKET_PROVIDERS, VCS_PROVIDERS, getProviderSpec } from '../config/providerRegistry';
+import { safeSpinner } from '../utils/tty';
 import type { FlowlaneConfig, ProviderId, TicketProvider, VcsProvider } from '../types';
 
 /** Human-readable descriptor for a profile's configured provider(s). */
@@ -306,7 +307,7 @@ async function askAzureBoardConfig(
 
   // ── Fetch board columns ──────────────────────────────────────────────────
 
-  const boardSpinner = p.spinner();
+  const boardSpinner = safeSpinner();
   boardSpinner.start(`Fetching board columns for "${block.team}"…`);
 
   let boardColumns: Awaited<ReturnType<typeof fetchBoardColumns>> | null = null;

@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import { errMsg } from '../utils/errors';
 import { container } from '../container';
 import { TOKENS }    from '../tokens';
-import { isInteractive } from '../utils/tty';
+import { isInteractive, safeSpinner } from '../utils/tty';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { IPRService }     from '../services/interfaces/IPRService';
 import type { PRSummary }      from '../types';
@@ -33,7 +33,7 @@ export async function prListCommand(options: PrListOptions = {}): Promise<void> 
 
   let all: PRSummary[];
   if (interactive) {
-    const spinner = p.spinner();
+    const spinner = safeSpinner();
     spinner.start('Fetching pull requests…');
     try {
       all = await prSvc.listPRs();

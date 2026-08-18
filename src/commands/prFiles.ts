@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import { errMsg } from '../utils/errors';
 import { container }      from '../container';
 import { TOKENS }         from '../tokens';
-import { isInteractive }  from '../utils/tty';
+import { isInteractive, safeSpinner }  from '../utils/tty';
 import type { IPRService } from '../services/interfaces/IPRService';
 import type { PRFile, PRSummary } from '../types';
 import { resolvePRId }    from '../utils/prResolve';
@@ -37,7 +37,7 @@ export async function prFilesCommand(prId?: string, options: PrFilesOptions = {}
   let pr: PRSummary | undefined;
 
   if (interactive) {
-    const spinner = p.spinner();
+    const spinner = safeSpinner();
     spinner.start(`Loading PR #${chalk.cyan(id)} files…`);
     try {
       [files, pr] = await Promise.all([
@@ -158,7 +158,7 @@ async function postComment(prSvc: IPRService, prId: number, file: PRFile): Promi
 
   const line = lineInput.trim() ? parseInt(lineInput.trim(), 10) : undefined;
 
-  const spinner = p.spinner();
+  const spinner = safeSpinner();
   spinner.start('Posting comment…');
   try {
     await prSvc.addComment(prId, text, {

@@ -6,6 +6,7 @@ import { container } from '../container';
 import { TOKENS }    from '../tokens';
 import type { IPRService } from '../services/interfaces/IPRService';
 import { resolvePRId }     from '../utils/prResolve';
+import { safeSpinner }     from '../utils/tty';
 
 /**
  * Open a pull request in the default browser.
@@ -25,7 +26,7 @@ export async function prOpenCommand(prId?: string): Promise<void> {
   }
 
   // Fetch full PR to get the URL (in case it was resolved from branch).
-  const spinner = p.spinner();
+  const spinner = safeSpinner();
   spinner.start(`Fetching PR #${chalk.cyan(id)}…`);
 
   let url: string;

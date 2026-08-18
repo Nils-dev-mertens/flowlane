@@ -10,6 +10,7 @@ import type { IPRService }     from '../services/interfaces/IPRService';
 import type { IGitService }    from '../services/interfaces/IGitService';
 import type { PullRequest }    from '../types';
 import { runHook }             from '../utils/hooks';
+import { safeSpinner }         from '../utils/tty';
 
 export interface PROptions {
   /** Called from an interactive TUI session. */
@@ -62,7 +63,7 @@ export async function prCommand(
 
   // ── Fetch ticket ──────────────────────────────────────────────────────────
 
-  const fetchSpinner = p.spinner();
+  const fetchSpinner = safeSpinner();
   fetchSpinner.start(`Fetching ticket ${chalk.cyan(ticketId)}…`);
 
   let ticket;
@@ -106,7 +107,7 @@ export async function prCommand(
 
   // ── Create PR ─────────────────────────────────────────────────────────────
 
-  const prSpinner = p.spinner();
+  const prSpinner = safeSpinner();
   prSpinner.start(`Creating ${isDraft ? 'draft ' : ''}pull request…`);
 
   let pr: PullRequest;

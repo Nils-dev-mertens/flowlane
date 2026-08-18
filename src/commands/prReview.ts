@@ -4,7 +4,7 @@ import { errMsg } from '../utils/errors';
 import { execSync } from 'child_process';
 import { container } from '../container';
 import { TOKENS } from '../tokens';
-import { isInteractive } from '../utils/tty';
+import { isInteractive, safeSpinner } from '../utils/tty';
 import type { IPRService } from '../services/interfaces/IPRService';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 import type {
@@ -156,7 +156,7 @@ async function resolveForSession(
     process.exit(1);
   }
 
-  const spinner = p.spinner();
+  const spinner = safeSpinner();
   spinner.start('Fetching open pull requests…');
   let prs: PRSummary[];
   try {
@@ -220,7 +220,7 @@ function printSummary(summary: PRSummary | undefined): void {
 // ── actions ───────────────────────────────────────────────────────────────────
 
 async function reviewThreads(prSvc: IPRService, prId: number): Promise<void> {
-  const spinner = p.spinner();
+  const spinner = safeSpinner();
   spinner.start('Loading threads…');
   let threads: PRThread[];
   try {
@@ -265,7 +265,7 @@ async function reviewThreads(prSvc: IPRService, prId: number): Promise<void> {
   if (p.isCancel(action) || action === 'back') return;
 
   if (action === 'resolve') {
-    const s = p.spinner();
+    const s = safeSpinner();
     s.start('Resolving thread…');
     try {
       await prSvc.resolveThread(prId, threadId);
@@ -280,7 +280,7 @@ async function reviewThreads(prSvc: IPRService, prId: number): Promise<void> {
   const text = await p.text({ message: 'Your reply:', placeholder: 'Type your reply…' });
   if (p.isCancel(text) || !text) return;
 
-  const s = p.spinner();
+  const s = safeSpinner();
   s.start('Posting reply…');
   try {
     await prSvc.replyToThread(prId, threadId, text);
@@ -292,7 +292,7 @@ async function reviewThreads(prSvc: IPRService, prId: number): Promise<void> {
 }
 
 async function reviewFiles(prSvc: IPRService, prId: number, summary?: PRSummary): Promise<void> {
-  const spinner = p.spinner();
+  const spinner = safeSpinner();
   spinner.start('Loading changed files…');
   let files: PRFile[];
   try {
@@ -389,7 +389,7 @@ async function postComment(prSvc: IPRService, prId: number, file?: PRFile): Prom
     }
   }
 
-  const spinner = p.spinner();
+  const spinner = safeSpinner();
   spinner.start('Posting comment…');
   try {
     await prSvc.addComment(prId, text, { filePath, startLine, endLine });
@@ -408,7 +408,7 @@ async function submitVote(prSvc: IPRService, prId: number): Promise<void> {
   if (p.isCancel(choice)) return;
 
   const vote = choice as PRVote;
-  const spinner = p.spinner();
+  const spinner = safeSpinner();
   spinner.start('Submitting review…');
   try {
     await prSvc.votePR(prId, vote);
@@ -427,7 +427,7 @@ async function publishDraft(prSvc: IPRService, prId: number): Promise<void> {
   });
   if (p.isCancel(confirmed) || !confirmed) return;
 
-  const spinner = p.spinner();
+  const spinner = safeSpinner();
   spinner.start('Publishing…');
   try {
     await prSvc.publishPR(prId);
@@ -452,7 +452,7 @@ async function completePR(prSvc: IPRService, prId: number): Promise<void> {
   });
   if (p.isCancel(confirmed) || !confirmed) return;
 
-  const spinner = p.spinner();
+  const spinner = safeSpinner();
   spinner.start('Completing pull request…');
   try {
     await prSvc.completePR(prId, strategy);
@@ -470,7 +470,7 @@ async function abandonPR(prSvc: IPRService, prId: number): Promise<void> {
   });
   if (p.isCancel(confirmed) || !confirmed) return;
 
-  const spinner = p.spinner();
+  const spinner = safeSpinner();
   spinner.start('Abandoning pull request…');
   try {
     await prSvc.abandonPR(prId);
