@@ -44,6 +44,14 @@ export const PROVIDER_SPECS: Record<ProviderId, ProviderSpec> = {
       { key: 'repo',  label: 'Repository name',               required: true, placeholder: 'my-repo' },
       { key: 'user',  label: 'GitHub username/login (not your email)', required: true, placeholder: 'jane' },
       {
+        key: 'authMethod',
+        label: 'Authentication method',
+        options: [
+          { value: 'pat',    label: 'Personal Access Token (PAT)', hint: 'token stored in config' },
+          { value: 'gh-cli', label: 'GitHub CLI (gh auth login)',   hint: 'no token stored' },
+        ],
+      },
+      {
         key: 'token',
         label: 'Token (optional for public reads, required for writes)',
         secret: true,
@@ -57,6 +65,7 @@ export const PROVIDER_SPECS: Record<ProviderId, ProviderSpec> = {
       token:      flat.token,
       user:       flat.user,
       baseBranch: flat.baseBranch,
+      authMethod: flat.authMethod,
       baseUrl:    flat.baseUrl,
       graphqlUrl: flat.githubGraphqlUrl,
     }),
