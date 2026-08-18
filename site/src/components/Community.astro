@@ -1,0 +1,60 @@
+---
+const cards = [
+  {
+    icon: 'code',
+    color: 'text-primary',
+    title: 'Contribute',
+    body: 'Open source under MIT. Issues, bug reports, and pull requests are welcome — CI runs tests and build on every PR.',
+    href: 'https://github.com/Nils-dev-mertens/flowlane',
+    cta: 'Go to GitHub',
+  },
+  {
+    icon: 'extension',
+    color: 'text-secondary',
+    title: 'Add a Provider',
+    body: 'The provider registry makes new platforms a checklist, not a fork: implement the service interface, register, done.',
+    href: 'https://github.com/Nils-dev-mertens/flowlane/blob/main/docs/adding-a-provider.md',
+    cta: 'Read the guide',
+  },
+  {
+    icon: 'star',
+    color: 'text-tertiary',
+    title: 'Spread the Word',
+    body: 'Star the repo, share it with your team, or install it at work. Free for individuals and teams, forever.',
+    href: 'https://www.npmjs.com/package/flowlane',
+    cta: 'View on npm',
+  },
+];
+---
+
+<section class="py-48 px-6 md:px-8 max-w-7xl mx-auto" id="community">
+  <div class="mb-24 text-center md:text-left">
+    <h2 class="text-5xl md:text-7xl font-black font-headline uppercase tracking-tighter mb-4">
+      BUILT IN THE <span class="text-primary">OPEN</span>
+    </h2>
+    <p class="text-on-surface-variant tracking-widest text-xs uppercase font-bold">Community · Contribution · Expansion</p>
+  </div>
+
+  <div class="grid md:grid-cols-3 gap-8">
+    {
+      cards.map((card) => (
+        <a
+          href={card.href}
+          target="_blank"
+          rel="noreferrer"
+          class="bg-surface-container p-10 flex flex-col justify-between min-h-[320px] border border-outline-variant/10 group hover:border-primary/40 transition-colors"
+        >
+          <div>
+            <span class:list={['material-symbols-outlined text-4xl mb-8', card.color]} style="font-variation-settings: 'FILL' 1;">{card.icon}</span>
+            <h3 class="text-2xl font-bold font-headline mb-4 uppercase">{card.title}</h3>
+            <p class="text-sm text-on-surface-variant leading-relaxed">{card.body}</p>
+          </div>
+          <div class="mt-8 pt-8 border-t border-outline-variant/10 flex items-center justify-between">
+            <span class="text-[10px] font-mono uppercase tracking-widest opacity-40">{card.cta}</span>
+            <span class="material-symbols-outlined text-primary group-hover:translate-x-1 transition-transform">arrow_forward</span>
+          </div>
+        </a>
+      ))
+    }
+  </div>
+</section>
