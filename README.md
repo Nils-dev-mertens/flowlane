@@ -120,6 +120,11 @@ Full workflow in one command:
 flowlane start 1234
 ```
 
+> `flowlane start` pushes the (empty) branch to origin *before* you commit. After
+> committing locally, push again with `git push -u origin <branch>` before running
+> `flowlane pr`, otherwise flowlane reports "There are no commits … not already in
+> the base branch" because it compares the remote branch, not local HEAD.
+
 ---
 
 ### `flowlane branch <ticketId>`
@@ -148,12 +153,16 @@ In interactive mode, flowlane asks whether the PR should be a draft. In non-inte
 
 ---
 
-### `flowlane pr comment <text>`
+### `flowlane pr comment <text> [prId]`
 
-Adds a comment to the open PR for the current branch. Supports inline comments targeting a specific file and line range.
+Adds a comment to a pull request. Without a PR ID it targets the open PR for the
+current branch; with an explicit PR ID it targets that PR directly, so you can
+comment on PRs you are not currently checked out on. Supports inline comments
+targeting a specific file and line range.
 
 ```bash
 flowlane pr comment "LGTM, just one nit below"
+flowlane pr comment "LGTM" 42         # comment on PR #42 from any branch
 
 # Inline comment on a specific file and line
 flowlane pr comment "Extract this into a helper" --file src/utils/branch.ts --line 42

@@ -5,6 +5,7 @@ import { container }   from '../container';
 import { TOKENS }      from '../tokens';
 import type { IPRService } from '../services/interfaces/IPRService';
 import { resolvePRId }     from '../utils/prResolve';
+import { safeSpinner }     from '../utils/tty';
 
 /**
  * Publish a draft pull request (mark as ready for review).
@@ -23,7 +24,7 @@ export async function prPublishCommand(prId?: string): Promise<void> {
   }
 
   // Show PR title for context.
-  const fetchSpinner = p.spinner();
+  const fetchSpinner = safeSpinner();
   fetchSpinner.start(`Fetching PR #${chalk.cyan(id)}…`);
   let prTitle = `PR #${id}`;
   try {
@@ -44,7 +45,7 @@ export async function prPublishCommand(prId?: string): Promise<void> {
     return;
   }
 
-  const spinner = p.spinner();
+  const spinner = safeSpinner();
   spinner.start('Publishing pull request…');
   try {
     await prSvc.publishPR(id);

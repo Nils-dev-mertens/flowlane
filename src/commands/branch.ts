@@ -9,6 +9,7 @@ import type { ITicketService } from '../services/interfaces/ITicketService';
 import type { IGitService }    from '../services/interfaces/IGitService';
 import { generateBranchName, titleIsTruncated } from '../utils/branch';
 import { runHook }             from '../utils/hooks';
+import { safeSpinner }         from '../utils/tty';
 
 export interface BranchOptions {
   /** Called from an interactive TUI session (skip self-contained intro/outro). */
@@ -38,7 +39,7 @@ export async function branchCommand(
 
   // ── Fetch ticket ──────────────────────────────────────────────────────────
 
-  const fetchSpinner = p.spinner();
+  const fetchSpinner = safeSpinner();
   fetchSpinner.start(`Fetching ticket ${chalk.cyan(ticketId)}…`);
 
   let ticket;
@@ -58,15 +59,21 @@ export async function branchCommand(
   let branchName = generatedName;
 
   if (wasTruncated) {
-    // Title was longer than the 4-word slug limit — let the user confirm or edit.
+    // Title was longer than the 4-word slug limit. In an interactive terminal
+    // let the user confirm or edit; otherwise use the generated name (this also
+    // avoids a TTY prompt crashing non-interactive/CI runs).
     p.log.warn(`Title is long; branch name was shortened to: ${chalk.green(generatedName)}`);
-    const edited = await p.text({
-      message: 'Branch name (edit if needed, Enter to accept):',
-      initialValue: generatedName,
-      validate: (v) => v.trim() ? undefined : 'Branch name cannot be empty',
-    });
-    if (p.isCancel(edited)) throw new Error('Cancelled');
-    branchName = (edited as string).trim();
+    if (interactive) {
+      const edited = await p.text({
+        message: 'Branch name (edit if needed, Enter to accept):',
+        initialValue: generatedName,
+        validate: (v) => v.trim() ? undefined : 'Branch name cannot be empty',
+      });
+      if (p.isCancel(edited)) throw new Error('Cancelled');
+      branchName = (edited as string).trim();
+    } else {
+      p.log.step(`Branch name: ${chalk.green(branchName)}`);
+    }
   } else if (interactive) {
     const confirmed = await p.confirm({
       message: `Create branch ${chalk.green(generatedName)}?`,
@@ -81,7 +88,7 @@ export async function branchCommand(
 
   // ── Create branch ─────────────────────────────────────────────────────────
 
-  const createSpinner = p.spinner();
+  const createSpinner = safeSpinner();
   createSpinner.start('Creating branch…');
   try {
     gitSvc.createBranch(branchName);
@@ -93,7 +100,7 @@ export async function branchCommand(
 
   // ── Push branch ───────────────────────────────────────────────────────────
 
-  const pushSpinner = p.spinner();
+  const pushSpinner = safeSpinner();
   pushSpinner.start('Pushing branch to origin…');
   try {
     gitSvc.publishBranch(branchName);

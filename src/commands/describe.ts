@@ -2,7 +2,7 @@ import * as p from '@clack/prompts';
 import chalk from 'chalk';
 import { container } from '../container';
 import { TOKENS }    from '../tokens';
-import { isInteractive } from '../utils/tty';
+import { isInteractive, safeSpinner } from '../utils/tty';
 import type { ITicketService } from '../services/interfaces/ITicketService';
 
 export interface DescribeOptions {
@@ -20,7 +20,7 @@ export async function describeCommand(ticketId: string, options: DescribeOptions
   let ticket;
 
   if (interactive) {
-    const spinner = p.spinner();
+    const spinner = safeSpinner();
     spinner.start(`Fetching ticket ${chalk.cyan(ticketId)}…`);
     try {
       ticket = await ticketSvc.getTicket(ticketId);

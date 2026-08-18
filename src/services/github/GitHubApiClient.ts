@@ -6,6 +6,10 @@ export interface GitHubApiClientOptions {
   /** Override the GraphQL endpoint for GitHub Enterprise deployments or tests. */
   graphqlUrl?: string;
   userAgent?: string;
+  /** Max times to retry a transient failure (503, 502, 504, 429). Default 3. */
+  maxRetries?: number;
+  /** Base delay in ms before the first retry; doubles each attempt. Default 500. */
+  retryDelayMs?: number;
 }
 
 export interface GitHubGraphQLError {
@@ -22,6 +26,10 @@ interface GitHubGraphQLResponse<T> {
 const DEFAULT_BASE_URL = 'https://api.github.com';
 const DEFAULT_USER_AGENT = 'flowlane-cli';
 const PAGE_SIZE = 100;
+const DEFAULT_MAX_RETRIES = 3;
+const DEFAULT_RETRY_DELAY_MS = 500;
+/** Status codes GitHub can return transiently; safe to retry with backoff. */
+const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 
 /**
  * Error raised for an unsuccessful GitHub REST or GraphQL request.
@@ -59,12 +67,16 @@ export class GitHubApiClient {
   private readonly graphqlUrl: string;
   private readonly token: string | undefined;
   private readonly userAgent: string;
+  private readonly maxRetries: number;
+  private readonly retryDelayMs: number;
 
   constructor(options: GitHubApiClientOptions) {
     this.baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, '');
     this.graphqlUrl = (options.graphqlUrl ?? `${this.baseUrl}/graphql`).replace(/\/$/, '');
     this.token = options.token;
     this.userAgent = options.userAgent ?? DEFAULT_USER_AGENT;
+    this.maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
+    this.retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
   }
 
   /** True when requests will use GitHub's authenticated rate limit. */
@@ -86,7 +98,7 @@ export class GitHubApiClient {
     }
 
     const url = this.toUrl(pathOrUrl);
-    const response = await fetch(url, {
+    const response = await this.fetchWithRetry(url, {
       method,
       headers: this.headers(),
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -153,7 +165,7 @@ export class GitHubApiClient {
       throw this.credentialError('GitHub GraphQL operations');
     }
 
-    const response = await fetch(this.graphqlUrl, {
+    const response = await this.fetchWithRetry(this.graphqlUrl, {
       method: 'POST',
       headers: {
         ...this.headers(),
@@ -194,6 +206,44 @@ export class GitHubApiClient {
     }
 
     return parsed.data;
+  }
+
+  /**
+   * Fetch with retry/backoff for transient GitHub failures (429, 5xx).
+   * Honors the `Retry-After` header when present; otherwise backs off
+   * exponentially from {@link retryDelayMs}. Non-retryable responses are
+   * returned immediately after the final attempt.
+   */
+  private async fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
+    let lastResponse: Response | undefined;
+
+    for (let attempt = 0; attempt <= this.maxRetries; attempt += 1) {
+      let response: Response;
+      try {
+        response = await fetch(url, init);
+      } catch (err: unknown) {
+        if (attempt === this.maxRetries) throw err;
+        await this.backoff(attempt, undefined);
+        continue;
+      }
+
+      if (response.ok || !RETRYABLE_STATUSES.has(response.status)) {
+        return response;
+      }
+
+      lastResponse = response;
+      if (attempt === this.maxRetries) return response;
+
+      await this.backoff(attempt, response.headers.get('retry-after'));
+    }
+
+    return lastResponse!;
+  }
+
+  private async backoff(attempt: number, retryAfter: string | null | undefined): Promise<void> {
+    const retryAfterMs = parseRetryAfter(retryAfter);
+    const delay = retryAfterMs ?? this.retryDelayMs * 2 ** attempt;
+    await new Promise((resolve) => setTimeout(resolve, delay));
   }
 
   private headers(): Record<string, string> {
@@ -285,4 +335,16 @@ function formatReset(value: string | null): string {
   const epoch = Number(value);
   if (!Number.isFinite(epoch)) return value;
   return new Date(epoch * 1000).toISOString();
+}
+
+function parseRetryAfter(value: string | null | undefined): number | undefined {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+  // HTTP-date form (e.g. Wed, 21 Oct 2015 07:28:00 GMT).
+  const date = new Date(value);
+  if (!Number.isNaN(date.getTime())) {
+    return Math.max(0, date.getTime() - Date.now());
+  }
+  return undefined;
 }
