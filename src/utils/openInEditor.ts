@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { execSync, spawn } from 'child_process';
+import { execFileSync, execSync, spawn } from 'child_process';
 import { mkdtempSync, writeFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -24,6 +24,15 @@ export function openDiffInEditor(file: PRFile, pr: PRSummary, options: EditorOpt
   }
 
   const command = options.command ?? 'code';
+
+  if (!isCommandAvailable(command)) {
+    console.log(
+      chalk.yellow(`  No editor found: "${command}" is not on your PATH. `) +
+      chalk.dim(`Install it or configure one with \`flowlane config set editor <cmd>\`.`),
+    );
+    return false;
+  }
+
   const base    = `origin/${pr.targetBranch}`;
   const head    = `origin/${pr.sourceBranch}`;
 
@@ -50,10 +59,13 @@ export function openDiffInEditor(file: PRFile, pr: PRSummary, options: EditorOpt
     try {
       const child = spawn(command, args, { stdio: 'ignore', detached: true });
       child.unref();
+      child.on('error', () => {
+        console.log(chalk.yellow(`  No editor found: "${command}" is not on your PATH.`));
+      });
       opened = true;
       console.log(`  ${chalk.green('✓')} Opened ${chalk.cyan(file.path)} in ${chalk.bold(command)}`);
     } catch {
-      console.log(chalk.dim(`  Failed to launch ${command}. Set \`editor\` with \`flowlane config set editor <cmd>\`.`));
+      console.log(chalk.yellow(`  No editor found: "${command}" could not be launched.`));
     }
   } finally {
     // Temp files live under the OS temp dir and are cleaned up by the system.
@@ -61,6 +73,16 @@ export function openDiffInEditor(file: PRFile, pr: PRSummary, options: EditorOpt
   }
 
   return opened;
+}
+
+/** True when the given command is resolvable on the current PATH. */
+function isCommandAvailable(command: string): boolean {
+  try {
+    execFileSync('sh', ['-c', `command -v "${command}"`], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Read a file version from a remote ref; returns undefined when unavailable. */
