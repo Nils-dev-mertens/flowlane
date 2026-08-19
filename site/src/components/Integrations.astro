@@ -1,6 +1,4 @@
 ---
-import Terminal from './Terminal.astro';
-
 const providers = [
   { mark: 'AZ', name: 'Azure DevOps', href: 'https://learn.microsoft.com/azure/devops/' },
   { mark: 'GH', name: 'GitHub', href: 'https://github.com/' },
@@ -11,54 +9,31 @@ const providers = [
 
 <section class="py-32 bg-surface-container-lowest border-y border-outline-variant/20 overflow-hidden" id="integrations">
   <div class="max-w-6xl mx-auto px-6 md:px-8">
-    <div class="grid md:grid-cols-2 items-center gap-20">
-      <div data-reveal>
-        <h2 class="text-5xl font-bold font-headline uppercase tracking-tighter mb-8 leading-none">
-          PLAYS WELL WITH <span class="text-primary">OTHERS</span>
-        </h2>
-        <p class="text-on-surface-variant text-lg mb-12">
-          flowlane doesn't replace your stack — it orchestrates it. Ticket and PR providers are configured
-          independently, so you can pair Jira ticketing with GitHub pull requests. A modular provider registry
-          makes adding a new platform a checklist, not a fork.
-        </p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {
-            providers.map((provider) => (
-              <a
-                href={provider.href}
-                target={provider.href.startsWith('http') ? '_blank' : undefined}
-                rel="noreferrer"
-                class="p-4 border border-outline-variant/10 flex items-center gap-4 bg-surface hover:border-primary/40 transition-colors"
-              >
-                <span class="w-8 h-8 bg-surface-variant flex items-center justify-center font-black text-[10px] text-on-surface">
-                  {provider.mark}
-                </span>
-                <span class="text-xs font-bold font-headline uppercase">{provider.name}</span>
-              </a>
-            ))
-          }
-        </div>
-      </div>
-
-      <div class="relative" data-reveal data-reveal-delay="0.15">
-        <div class="absolute -inset-4 border border-primary/20" aria-hidden="true"></div>
-        <Terminal title="flowlane config list" frameClass="relative border border-outline-variant/20">
-          <div data-reveal-group>
-            <div class="text-tertiary-fixed-dim">$ flowlane config list</div>
-            <div class="mt-3 pl-4 border-l border-outline-variant/20 space-y-1.5">
-              <div class="flex justify-between">
-                <span>Active config — profile: work</span>
-                <span class="text-primary">OK</span>
-              </div>
-              <div class="flex justify-between"><span>[01] ticketProvider</span> <span class="text-primary">jira</span></div>
-              <div class="flex justify-between"><span>[02] vcsProvider</span> <span class="text-primary">github</span></div>
-              <div class="flex justify-between"><span>[03] github.owner</span> <span class="text-on-surface-variant">Nils-dev-mertens</span></div>
-              <div class="flex justify-between"><span>[04] jira.site</span> <span class="text-on-surface-variant">acme.atlassian.net</span></div>
-            </div>
-            <div class="mt-3 text-secondary-fixed-dim">Successfully synced 2 environments.</div>
-            <div class="inline-block w-2 h-4 bg-primary"></div>
-          </div>
-        </Terminal>
+    <div class="max-w-3xl" data-reveal>
+      <h2 class="text-5xl font-bold font-headline uppercase tracking-tighter mb-8 leading-none">
+        PLAYS WELL WITH <span class="text-primary">OTHERS</span>
+      </h2>
+      <p class="text-on-surface-variant text-lg mb-12">
+        flowlane doesn't replace your stack — it orchestrates it. Ticket and PR providers are configured
+        independently, so you can pair Jira ticketing with GitHub pull requests. A modular provider registry
+        makes adding a new platform a checklist, not a fork.
+      </p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {
+          providers.map((provider) => (
+            <a
+              href={provider.href}
+              target={provider.href.startsWith('http') ? '_blank' : undefined}
+              rel="noreferrer"
+              class="p-4 border border-outline-variant/10 flex items-center gap-4 bg-surface hover:border-primary/40 transition-colors"
+            >
+              <span class="w-8 h-8 bg-surface-variant flex items-center justify-center font-black text-[10px] text-on-surface">
+                {provider.mark}
+              </span>
+              <span class="text-xs font-bold font-headline uppercase">{provider.name}</span>
+            </a>
+          ))
+        }
       </div>
     </div>
 
