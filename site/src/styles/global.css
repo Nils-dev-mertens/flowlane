@@ -110,3 +110,116 @@ body::before {
 .term-line:hover::after {
   transform: scaleX(1);
 }
+
+/* Hero background: slowly rotating architectural frames */
+.hero-frame {
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+.hero-frame-a {
+  rotate: 45deg;
+  animation-name: hero-spin-a;
+  animation-duration: 90s;
+}
+
+.hero-frame-b {
+  rotate: -12deg;
+  animation-name: hero-spin-b;
+  animation-duration: 140s;
+}
+
+@keyframes hero-spin-a {
+  from {
+    rotate: 45deg;
+  }
+  to {
+    rotate: 405deg;
+  }
+}
+
+@keyframes hero-spin-b {
+  from {
+    rotate: -12deg;
+  }
+  to {
+    rotate: 348deg;
+  }
+}
+
+/* Hero index tiles: 01 / 02 / 03. Outlined blueprint numerals that invert to
+   signal red on hover while the tile fills from the bottom. */
+.stat-tile {
+  position: relative;
+  isolation: isolate;
+  color: #e7e0ec;
+  transition: color 0.3s ease;
+}
+
+.stat-tile::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: #ff5545;
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.stat-tile:hover::before {
+  transform: scaleY(1);
+}
+
+.stat-index {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 900;
+  font-size: clamp(3.5rem, 6vw, 5rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(255, 180, 170, 0.65);
+  transition: color 0.3s ease, -webkit-text-stroke 0.3s ease, transform 0.3s ease;
+}
+
+.stat-tile:hover .stat-index {
+  color: #5c0002;
+  -webkit-text-stroke: 1px #5c0002;
+  transform: translateX(4px);
+}
+
+.stat-arrow {
+  align-self: flex-start;
+  color: #ffb4aa;
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: opacity 0.3s ease, transform 0.3s ease, color 0.3s ease;
+}
+
+.stat-tile:hover .stat-arrow {
+  opacity: 1;
+  transform: translateX(0);
+  color: #5c0002;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-frame-a,
+  .hero-frame-b {
+    animation: none;
+  }
+
+  .stat-tile::before {
+    transition: none;
+  }
+
+  .stat-index {
+    transition: none;
+  }
+
+  .stat-arrow {
+    transition: none;
+    opacity: 1;
+    transform: none;
+  }
+}

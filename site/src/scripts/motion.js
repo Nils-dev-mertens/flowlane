@@ -1,7 +1,56 @@
-import { animate, inView, scroll, stagger } from 'motion';
+import { animate, inView, motionValue, scroll, stagger } from 'motion';
 
 const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const easeOut = [0.22, 1, 0.36, 1];
+
+// Hero: pointer-driven parallax, interactive grid, and magnetic CTAs.
+const hero = document.getElementById('hero');
+if (hero && !reduce) {
+  const layerDefs = [
+    { el: hero.querySelector('.hero-frame-a'), strength: 34 },
+    { el: hero.querySelector('.hero-frame-b'), strength: -26 },
+    { el: hero.querySelector('[data-parallax]'), strength: 10 },
+  ];
+  const layers = layerDefs
+    .filter((l) => l.el)
+    .map((l) => ({ ...l, x: motionValue(0), y: motionValue(0) }));
+
+  layers.forEach((l) => {
+    animate(l.el, { x: l.x, y: l.y }, { type: 'spring', stiffness: 90, damping: 18, mass: 0.8 });
+  });
+
+  hero.addEventListener('pointermove', (e) => {
+    const r = hero.getBoundingClientRect();
+    const nx = (e.clientX - r.left) / r.width - 0.5;
+    const ny = (e.clientY - r.top) / r.height - 0.5;
+    layers.forEach((l) => {
+      l.x.set(nx * l.strength);
+      l.y.set(ny * l.strength);
+    });
+  });
+
+  hero.addEventListener('pointerleave', () => {
+    layers.forEach((l) => {
+      l.x.set(0);
+      l.y.set(0);
+    });
+  });
+
+  document.querySelectorAll('[data-magnetic]').forEach((el) => {
+    const mx = motionValue(0);
+    const my = motionValue(0);
+    animate(el, { x: mx, y: my }, { type: 'spring', stiffness: 180, damping: 14, mass: 0.5 });
+    el.addEventListener('pointermove', (e) => {
+      const r = el.getBoundingClientRect();
+      mx.set((e.clientX - (r.left + r.width / 2)) * 0.18);
+      my.set((e.clientY - (r.top + r.height / 2)) * 0.18);
+    });
+    el.addEventListener('pointerleave', () => {
+      mx.set(0);
+      my.set(0);
+    });
+  });
+}
 
 if (reduce) {
   // Never hide content for users who asked for reduced motion.

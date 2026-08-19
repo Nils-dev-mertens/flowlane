@@ -3,14 +3,17 @@ import pkg from '../../../package.json';
 import Command from './Command.astro';
 ---
 
-<section class="relative min-h-screen flex flex-col items-center justify-center pt-32 pb-24 px-6 md:px-8 text-center overflow-hidden">
-  <!-- Decorative rotated frames -->
+<section
+  id="hero"
+  class="relative min-h-screen flex flex-col items-center justify-center pt-32 pb-24 px-6 md:px-8 text-center overflow-hidden"
+>
+  <!-- Interactive architectural index: 01 / 02 / 03 tiles -->
   <div class="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none" aria-hidden="true">
-    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] border border-outline-variant/30 rotate-45"></div>
-    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1200px] h-[1200px] border border-outline-variant/10 -rotate-12"></div>
+    <div class="hero-frame hero-frame-a absolute inset-0 m-auto w-[800px] h-[800px] border border-outline-variant/30"></div>
+    <div class="hero-frame hero-frame-b absolute inset-0 m-auto w-[1200px] h-[1200px] border border-outline-variant/10"></div>
   </div>
 
-  <div class="relative z-10 flex flex-col items-center">
+  <div class="relative z-10 flex flex-col items-center" data-parallax="8">
     <div class="flex flex-wrap items-center justify-center gap-2 mb-8" data-reveal>
       <span class="px-2 py-1 bg-secondary-container/20 text-secondary text-[10px] font-mono uppercase tracking-wider">Open Source · MIT</span>
       <span class="px-2 py-1 bg-secondary-container/20 text-secondary text-[10px] font-mono uppercase tracking-wider">v{pkg.version}</span>
@@ -30,32 +33,54 @@ import Command from './Command.astro';
       <Command command="npm install -g flowlane" />
       <a
         href="#install"
-        class="w-full md:w-auto whitespace-nowrap bg-primary-container text-on-primary-container px-10 py-5 font-black uppercase tracking-widest text-sm hover:bg-primary transition-colors active:scale-95"
+        data-magnetic
+        class="w-full md:w-auto whitespace-nowrap bg-primary-container text-on-primary-container px-10 py-5 font-black uppercase tracking-widest text-sm hover:bg-primary transition-colors"
       >
         Initialize Flow
       </a>
     </div>
   </div>
 
-  <!-- Hero stats -->
+  <!-- Hero index: 01 / 02 / 03 -->
   <div class="mt-24 grid grid-cols-1 md:grid-cols-3 w-full max-w-6xl border-t border-outline-variant/10" data-reveal-group>
-    <div class="p-8 text-left border-b md:border-b-0 md:border-r border-outline-variant/10">
-      <span class="text-xs font-bold text-primary font-headline tracking-widest uppercase mb-4 block">01 / Speed</span>
-      <p class="text-sm text-on-surface-variant leading-relaxed">
-        Instant command execution without browser overhead. Tickets, branches, and PRs — handled from the home row.
-      </p>
-    </div>
-    <div class="p-8 text-left border-b md:border-b-0 md:border-r border-outline-variant/10">
-      <span class="text-xs font-bold text-primary font-headline tracking-widest uppercase mb-4 block">02 / Open Source</span>
-      <p class="text-sm text-on-surface-variant leading-relaxed">
-        Built by devs, for devs. MIT licensed and free forever — no enterprise gates on core productivity features.
-      </p>
-    </div>
-    <div class="p-8 text-left">
-      <span class="text-xs font-bold text-primary font-headline tracking-widest uppercase mb-4 block">03 / Universal</span>
-      <p class="text-sm text-on-surface-variant leading-relaxed">
-        One tool for Azure DevOps, GitHub, and Jira. Mix ticket and PR providers freely — Jira tickets with GitHub PRs.
-      </p>
-    </div>
+    <a
+      href="#story"
+      class="stat-tile group p-8 text-left border-b md:border-b-0 md:border-r border-outline-variant/10 flex flex-col gap-6"
+    >
+      <span class="stat-index" aria-hidden="true">01</span>
+      <div>
+        <h3 class="text-xs font-bold font-headline tracking-widest uppercase mb-3">Speed</h3>
+        <p class="text-sm leading-relaxed">
+          Instant command execution without browser overhead. Tickets, branches, and PRs — handled from the home row.
+        </p>
+      </div>
+      <span class="stat-arrow material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+    </a>
+    <a
+      href="#community"
+      class="stat-tile group p-8 text-left border-b md:border-b-0 md:border-r border-outline-variant/10 flex flex-col gap-6"
+    >
+      <span class="stat-index" aria-hidden="true">02</span>
+      <div>
+        <h3 class="text-xs font-bold font-headline tracking-widest uppercase mb-3">Open Source</h3>
+        <p class="text-sm leading-relaxed">
+          Built by devs, for devs. MIT licensed and free forever — no enterprise gates on core productivity features.
+        </p>
+      </div>
+      <span class="stat-arrow material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+    </a>
+    <a
+      href="#integrations"
+      class="stat-tile group p-8 text-left flex flex-col gap-6"
+    >
+      <span class="stat-index" aria-hidden="true">03</span>
+      <div>
+        <h3 class="text-xs font-bold font-headline tracking-widest uppercase mb-3">Universal</h3>
+        <p class="text-sm leading-relaxed">
+          One tool for Azure DevOps, GitHub, and Jira. Mix ticket and PR providers freely — Jira tickets with GitHub PRs.
+        </p>
+      </div>
+      <span class="stat-arrow material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+    </a>
   </div>
 </section>
