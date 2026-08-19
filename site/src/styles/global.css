@@ -42,3 +42,398 @@ body::before {
   background-color: #ff5545;
   color: #5c0002;
 }
+
+/* Only hide reveal targets once JS is confirmed available, so content never
+   gets stuck invisible when scripts fail or are blocked. */
+.js [data-reveal] {
+  opacity: 0;
+}
+
+.js [data-reveal-group] > * {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .js [data-reveal],
+  .js [data-reveal-group] > * {
+    opacity: 1;
+  }
+}
+
+/* Scroll progress indicator */
+#scroll-progress {
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+/* Marquee strip for provider logos */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 32s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* Terminal line that fills with a signal-red underline on hover */
+.term-line {
+  position: relative;
+  transition: color 0.25s ease;
+}
+
+.term-line::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  height: 1px;
+  width: 100%;
+  background: #ff5545;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s ease;
+}
+
+.term-line:hover {
+  color: #ffb4aa;
+}
+
+.term-line:hover::after {
+  transform: scaleX(1);
+}
+
+/* Hero background: slowly rotating architectural frames */
+.hero-frame {
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+.hero-frame-a {
+  rotate: 45deg;
+  animation-name: hero-spin-a;
+  animation-duration: 90s;
+}
+
+.hero-frame-b {
+  rotate: -12deg;
+  animation-name: hero-spin-b;
+  animation-duration: 140s;
+}
+
+@keyframes hero-spin-a {
+  from {
+    rotate: 45deg;
+  }
+  to {
+    rotate: 405deg;
+  }
+}
+
+@keyframes hero-spin-b {
+  from {
+    rotate: -12deg;
+  }
+  to {
+    rotate: 348deg;
+  }
+}
+
+/* Terminal command lines: a hard-blinking block cursor appears on the active line */
+.term-cmd-line {
+  position: relative;
+}
+
+.term-cmd-line.active::after {
+  content: '';
+  display: inline-block;
+  width: 0.5rem;
+  height: 1rem;
+  margin-left: 0.25rem;
+  vertical-align: text-bottom;
+  background: #ff5545;
+  animation: term-blink 1s steps(1) infinite;
+}
+
+@keyframes term-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Rendered markdown (docs pages) */
+.markdown {
+  color: #e7e0ec;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: #e7e0ec;
+  margin: 2.5rem 0 0.75rem;
+  scroll-margin-top: 96px;
+}
+
+.markdown h1 {
+  font-size: 2.5rem;
+  margin-top: 0;
+}
+
+.markdown h2 {
+  font-size: 1.55rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(93, 63, 59, 0.3);
+}
+
+.markdown h3 {
+  font-size: 1.15rem;
+}
+
+.markdown h4 {
+  font-size: 0.95rem;
+}
+
+.markdown p {
+  margin: 0 0 1rem;
+}
+
+.markdown a {
+  color: #ffb4aa;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.markdown a:hover {
+  opacity: 0.8;
+}
+
+.markdown strong {
+  color: #e7e0ec;
+}
+
+.markdown code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.85em;
+  background: #211e27;
+  color: #d4bbff;
+  padding: 0.15em 0.4em;
+}
+
+.markdown pre {
+  position: relative;
+  background: #100d15;
+  border: 1px solid rgba(93, 63, 59, 0.2);
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  margin: 0 0 1rem;
+  line-height: 1.6;
+}
+
+.markdown pre code {
+  background: none;
+  color: #e7e0ec;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.markdown ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0 0 1rem;
+}
+
+.markdown ul li {
+  position: relative;
+  padding-left: 1.25rem;
+  margin-bottom: 0.35rem;
+}
+
+.markdown ul li::before {
+  content: '◇';
+  position: absolute;
+  left: 0;
+  color: #ff5545;
+  font-size: 0.8em;
+}
+
+.markdown ol {
+  margin: 0 0 1rem;
+  padding-left: 1.5rem;
+}
+
+.markdown li {
+  margin-bottom: 0.35rem;
+}
+
+.markdown blockquote {
+  border-left: 3px solid #ff5545;
+  margin: 0 0 1rem;
+  padding: 0.25rem 1rem;
+  background: rgba(255, 180, 170, 0.05);
+  color: #e7bdb7;
+}
+
+.markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+}
+
+.markdown th,
+.markdown td {
+  border: 1px solid rgba(93, 63, 59, 0.25);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown th {
+  background: #211e27;
+  font-family: 'Space Grotesk', sans-serif;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: #ffb4aa;
+}
+
+.markdown td {
+  color: #e7e0ec;
+}
+
+.markdown hr {
+  border: 0;
+  border-top: 1px solid rgba(93, 63, 59, 0.3);
+  margin: 2rem 0;
+}
+
+/* Docs copy button: slides in on hover over a code block. */
+.copy-docs {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem;
+  color: #e7e0ec;
+  background: #211e27;
+  border: 1px solid rgba(93, 63, 59, 0.35);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.markdown pre:hover .copy-docs {
+  opacity: 1;
+}
+
+.copy-docs:hover {
+  color: #ff5545;
+}
+
+/* Docs scrollspy: highlight the TOC entry of the heading in view. */
+[data-toc] a.toc-active {
+  color: #ffb4aa;
+}
+
+/* Hero index tiles: 01 / 02 / 03. Outlined blueprint numerals that invert to
+   signal red on hover while the tile fills from the bottom. */
+.stat-tile {
+  position: relative;
+  isolation: isolate;
+  color: #e7e0ec;
+  transition: color 0.3s ease;
+}
+
+.stat-tile::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: #ff5545;
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.stat-tile:hover::before {
+  transform: scaleY(1);
+}
+
+.stat-index {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 900;
+  font-size: clamp(3.5rem, 6vw, 5rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(255, 180, 170, 0.65);
+  transition: color 0.3s ease, -webkit-text-stroke 0.3s ease, transform 0.3s ease;
+}
+
+.stat-tile:hover .stat-index {
+  color: #5c0002;
+  -webkit-text-stroke: 1px #5c0002;
+  transform: translateX(4px);
+}
+
+.stat-arrow {
+  align-self: flex-start;
+  color: #ffb4aa;
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: opacity 0.3s ease, transform 0.3s ease, color 0.3s ease;
+}
+
+.stat-tile:hover .stat-arrow {
+  opacity: 1;
+  transform: translateX(0);
+  color: #5c0002;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-frame-a,
+  .hero-frame-b {
+    animation: none;
+  }
+
+  .term-cmd-line.active::after {
+    animation: none;
+  }
+
+  .stat-tile::before {
+    transition: none;
+  }
+
+  .stat-index {
+    transition: none;
+  }
+
+  .stat-arrow {
+    transition: none;
+    opacity: 1;
+    transform: none;
+  }
+}

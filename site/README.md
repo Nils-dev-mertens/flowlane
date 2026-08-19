@@ -9,6 +9,29 @@ zero border-radius, Space Grotesk / Inter, signal-red accents).
 The repo root is the published npm package. `package.json` ships only `dist/`, `README.md`, and
 `LICENSE.md` via the `files` allowlist, so this folder never leaks into the npm artifact.
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Run locally
 
 ```bash

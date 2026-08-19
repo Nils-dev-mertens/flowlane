@@ -1,0 +1,20 @@
+---
+import { readFileSync } from 'node:fs';
+import { createMarkdownProcessor } from '@astrojs/markdown-remark';
+import DocsLayout from '../../layouts/DocsLayout.astro';
+
+const src = readFileSync(new URL('../../../../docs/adding-a-provider.md', import.meta.url), 'utf-8');
+const processor = await createMarkdownProcessor({
+  syntaxHighlight: 'shiki',
+  shikiConfig: { theme: 'dark-plus' },
+});
+const { code } = await processor.render(src);
+---
+
+<DocsLayout
+  title="Add a Provider — flowlane"
+  description="Extend flowlane with your own ticket or pull-request provider."
+  html={code}
+  current="/docs/adding-a-provider"
+  source="docs/adding-a-provider.md"
+/>
