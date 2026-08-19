@@ -1,0 +1,39 @@
+name: Deploy site
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'site/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Connect runner to Tailscale
+      - name: Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          version: latest
+
+      # Deploy to server
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: Deploy
+        run: |
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.TS_USER }}@${{ secrets.TS_HOST }} "
+          cd /home/${{ secrets.TS_USER }}/Desktop/flowlane/
+          git pull
+          docker build -f site/Dockerfile -t flowlane-site .
+          docker stop flowlane-site || true
+          docker rm flowlane-site || true
+          docker run -d --name flowlane-site -p 4747:80 flowlane-site:latest
+          "

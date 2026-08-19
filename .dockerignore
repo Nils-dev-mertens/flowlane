@@ -1,0 +1,6 @@
+node_modules
+dist
+site/node_modules
+site/dist
+.git
+.github
