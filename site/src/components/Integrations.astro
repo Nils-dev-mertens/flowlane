@@ -9,35 +9,36 @@ const providers = [
 
 <section class="py-32 bg-surface-container-lowest border-y border-outline-variant/20 overflow-hidden" id="integrations">
   <div class="max-w-6xl mx-auto px-6 md:px-8">
-    <div class="max-w-3xl" data-reveal>
-      <h2 class="text-5xl font-bold font-headline uppercase tracking-tighter mb-8 leading-none">
+    <div class="mb-16 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-10" data-reveal>
+      <h2 class="text-5xl font-bold font-headline uppercase tracking-tighter leading-none">
         PLAYS WELL WITH <span class="text-primary">OTHERS</span>
       </h2>
-      <p class="text-on-surface-variant text-lg mb-12">
+      <p class="max-w-xl text-on-surface-variant text-lg">
         flowlane doesn't replace your stack — it orchestrates it. Ticket and PR providers are configured
         independently, so you can pair Jira ticketing with GitHub pull requests. A modular provider registry
         makes adding a new platform a checklist, not a fork.
       </p>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {
-          providers.map((provider) => (
-            <a
-              href={provider.href}
-              target={provider.href.startsWith('http') ? '_blank' : undefined}
-              rel="noreferrer"
-              class="p-4 border border-outline-variant/10 flex items-center gap-4 bg-surface hover:border-primary/40 transition-colors"
-            >
-              <span class="w-8 h-8 bg-surface-variant flex items-center justify-center font-black text-[10px] text-on-surface">
-                {provider.mark}
-              </span>
-              <span class="text-xs font-bold font-headline uppercase">{provider.name}</span>
-            </a>
-          ))
-        }
-      </div>
     </div>
 
-    <div class="mt-20 border-y border-outline-variant/10 py-4 overflow-hidden" aria-hidden="true">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-reveal-group>
+      {
+        providers.map((provider) => (
+          <a
+            href={provider.href}
+            target={provider.href.startsWith('http') ? '_blank' : undefined}
+            rel="noreferrer"
+            class="p-4 border border-outline-variant/10 flex items-center gap-4 bg-surface hover:border-primary/40 transition-colors"
+          >
+            <span class="w-8 h-8 bg-surface-variant flex items-center justify-center font-black text-[10px] text-on-surface">
+              {provider.mark}
+            </span>
+            <span class="text-xs font-bold font-headline uppercase">{provider.name}</span>
+          </a>
+        ))
+      }
+    </div>
+
+    <div class="mt-16 border-y border-outline-variant/10 py-4 overflow-hidden" aria-hidden="true">
       <div class="flex gap-12 whitespace-nowrap animate-marquee w-max">
         {
           [...providers, ...providers].map((provider, i) => (
