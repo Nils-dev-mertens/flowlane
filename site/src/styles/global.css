@@ -192,6 +192,7 @@ body::before {
   line-height: 1.15;
   color: #e7e0ec;
   margin: 2.5rem 0 0.75rem;
+  scroll-margin-top: 96px;
 }
 
 .markdown h1 {
@@ -240,6 +241,7 @@ body::before {
 }
 
 .markdown pre {
+  position: relative;
   background: #100d15;
   border: 1px solid rgba(93, 63, 59, 0.2);
   padding: 1rem 1.25rem;
@@ -324,6 +326,36 @@ body::before {
   border: 0;
   border-top: 1px solid rgba(93, 63, 59, 0.3);
   margin: 2rem 0;
+}
+
+/* Docs copy button: slides in on hover over a code block. */
+.copy-docs {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem;
+  color: #e7e0ec;
+  background: #211e27;
+  border: 1px solid rgba(93, 63, 59, 0.35);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.markdown pre:hover .copy-docs {
+  opacity: 1;
+}
+
+.copy-docs:hover {
+  color: #ff5545;
+}
+
+/* Docs scrollspy: highlight the TOC entry of the heading in view. */
+[data-toc] a.toc-active {
+  color: #ffb4aa;
 }
 
 /* Hero index tiles: 01 / 02 / 03. Outlined blueprint numerals that invert to

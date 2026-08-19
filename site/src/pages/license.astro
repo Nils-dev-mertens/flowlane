@@ -11,6 +11,10 @@ const processor = await createMarkdownProcessor({
 const { code } = await processor.render(src);
 ---
 
-<DocsLayout title="License — flowlane" description="flowlane is MIT licensed — free forever.">
-  <Fragment set:html={code} />
-</DocsLayout>
+<DocsLayout
+  title="License — flowlane"
+  description="flowlane is MIT licensed — free forever."
+  html={code}
+  current="/license"
+  source="LICENSE.md"
+/>

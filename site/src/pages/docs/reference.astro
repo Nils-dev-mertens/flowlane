@@ -11,6 +11,10 @@ const processor = await createMarkdownProcessor({
 const { code } = await processor.render(src);
 ---
 
-<DocsLayout title="Reference — flowlane" description="flowlane command reference: install, setup, and the full CLI surface.">
-  <Fragment set:html={code} />
-</DocsLayout>
+<DocsLayout
+  title="Reference — flowlane"
+  description="flowlane command reference: install, setup, and the full CLI surface."
+  html={code}
+  current="/docs/reference"
+  source="README.md"
+/>

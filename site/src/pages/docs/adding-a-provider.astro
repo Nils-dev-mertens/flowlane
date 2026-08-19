@@ -11,6 +11,10 @@ const processor = await createMarkdownProcessor({
 const { code } = await processor.render(src);
 ---
 
-<DocsLayout title="Add a Provider — flowlane" description="Extend flowlane with your own ticket or pull-request provider.">
-  <Fragment set:html={code} />
-</DocsLayout>
+<DocsLayout
+  title="Add a Provider — flowlane"
+  description="Extend flowlane with your own ticket or pull-request provider."
+  html={code}
+  current="/docs/adding-a-provider"
+  source="docs/adding-a-provider.md"
+/>
