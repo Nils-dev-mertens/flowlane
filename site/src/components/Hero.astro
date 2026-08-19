@@ -1,4 +1,5 @@
 ---
+import pkg from '../../../package.json';
 import Command from './Command.astro';
 ---
 
@@ -9,27 +10,35 @@ import Command from './Command.astro';
     <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1200px] h-[1200px] border border-outline-variant/10 -rotate-12"></div>
   </div>
 
-  <h1 class="text-[clamp(4rem,15vw,12rem)] font-black tracking-tighter leading-none mb-4 font-headline uppercase">
-    FLOWLANE
-  </h1>
+  <div class="relative z-10 flex flex-col items-center">
+    <div class="flex flex-wrap items-center justify-center gap-2 mb-8" data-reveal>
+      <span class="px-2 py-1 bg-secondary-container/20 text-secondary text-[10px] font-mono uppercase tracking-wider">Open Source · MIT</span>
+      <span class="px-2 py-1 bg-secondary-container/20 text-secondary text-[10px] font-mono uppercase tracking-wider">v{pkg.version}</span>
+      <span class="px-2 py-1 bg-secondary-container/20 text-secondary text-[10px] font-mono uppercase tracking-wider">Azure DevOps · GitHub · Jira</span>
+    </div>
 
-  <p class="max-w-2xl text-on-surface-variant font-medium tracking-tight mb-12 text-lg md:text-xl">
-    The high-velocity CLI for engineers who refuse to leave the terminal.
-    <span class="text-primary italic">Automate the architecture of your workflow.</span>
-  </p>
+    <h1 class="text-[clamp(4rem,15vw,12rem)] font-black tracking-tighter leading-none mb-4 font-headline uppercase" data-reveal data-reveal-delay="0.05">
+      FLOWLANE
+    </h1>
 
-  <div class="flex flex-col md:flex-row items-center gap-6 w-full max-w-3xl">
-    <Command command="npm install -g flowlane" />
-    <a
-      href="#install"
-      class="w-full md:w-auto whitespace-nowrap bg-primary-container text-on-primary-container px-10 py-5 font-black uppercase tracking-widest text-sm hover:bg-primary transition-colors"
-    >
-      Initialize Flow
-    </a>
+    <p class="max-w-2xl text-on-surface-variant font-medium tracking-tight mb-12 text-lg md:text-xl" data-reveal data-reveal-delay="0.1">
+      The high-velocity CLI for engineers who refuse to leave the terminal.
+      <span class="text-primary italic">Automate the architecture of your workflow.</span>
+    </p>
+
+    <div class="flex flex-col md:flex-row items-center gap-6 w-full max-w-3xl" data-reveal data-reveal-delay="0.15">
+      <Command command="npm install -g flowlane" />
+      <a
+        href="#install"
+        class="w-full md:w-auto whitespace-nowrap bg-primary-container text-on-primary-container px-10 py-5 font-black uppercase tracking-widest text-sm hover:bg-primary transition-colors active:scale-95"
+      >
+        Initialize Flow
+      </a>
+    </div>
   </div>
 
   <!-- Hero stats -->
-  <div class="mt-24 grid grid-cols-1 md:grid-cols-3 w-full max-w-6xl border-t border-outline-variant/10">
+  <div class="mt-24 grid grid-cols-1 md:grid-cols-3 w-full max-w-6xl border-t border-outline-variant/10" data-reveal-group>
     <div class="p-8 text-left border-b md:border-b-0 md:border-r border-outline-variant/10">
       <span class="text-xs font-bold text-primary font-headline tracking-widest uppercase mb-4 block">01 / Speed</span>
       <p class="text-sm text-on-surface-variant leading-relaxed">

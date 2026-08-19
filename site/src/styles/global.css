@@ -42,3 +42,71 @@ body::before {
   background-color: #ff5545;
   color: #5c0002;
 }
+
+/* Only hide reveal targets once JS is confirmed available, so content never
+   gets stuck invisible when scripts fail or are blocked. */
+.js [data-reveal] {
+  opacity: 0;
+}
+
+.js [data-reveal-group] > * {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .js [data-reveal],
+  .js [data-reveal-group] > * {
+    opacity: 1;
+  }
+}
+
+/* Scroll progress indicator */
+#scroll-progress {
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+/* Marquee strip for provider logos */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 32s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* Terminal line that fills with a signal-red underline on hover */
+.term-line {
+  position: relative;
+  transition: color 0.25s ease;
+}
+
+.term-line::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  height: 1px;
+  width: 100%;
+  background: #ff5545;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s ease;
+}
+
+.term-line:hover {
+  color: #ffb4aa;
+}
+
+.term-line:hover::after {
+  transform: scaleX(1);
+}

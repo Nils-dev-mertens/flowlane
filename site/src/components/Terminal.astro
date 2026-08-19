@@ -6,7 +6,7 @@ interface Props {
   frameClass?: string;
 }
 
-const { title = 'flowlane', frameClass = '' } = Astro.props;
+const { title = 'flowlane', frameClass = '', ...rest } = Astro.props;
 ---
 
 <div
@@ -14,6 +14,7 @@ const { title = 'flowlane', frameClass = '' } = Astro.props;
     'bg-surface-container-lowest border border-outline-variant/20 relative flex flex-col overflow-hidden',
     frameClass,
   ]}
+  {...rest}
 >
   <div class="flex items-center gap-1.5 px-4 py-3 border-b border-outline-variant/10 shrink-0">
     <span class="w-2.5 h-2.5 bg-[#ff5545]/80"></span>

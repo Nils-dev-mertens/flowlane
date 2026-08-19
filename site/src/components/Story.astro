@@ -4,7 +4,7 @@ import Terminal from './Terminal.astro';
 
 <section class="py-32 bg-surface-container-low px-6 md:px-8 border-y border-outline-variant/5" id="story">
   <div class="max-w-6xl mx-auto grid md:grid-cols-2 gap-20 items-center">
-    <div class="space-y-8">
+    <div class="space-y-8" data-reveal>
       <h2 class="text-4xl md:text-6xl font-bold font-headline leading-none uppercase tracking-tighter">
         STOP <span class="text-primary">CONTEXT</span> SWITCHING.
       </h2>
@@ -29,21 +29,25 @@ import Terminal from './Terminal.astro';
       </p>
     </div>
 
-    <Terminal title="flowlane start 14" frameClass="aspect-square p-10 md:p-12">
-      <div class="flex flex-col justify-between h-full gap-6">
-        <div>
-          <div class="text-tertiary-fixed-dim">$ flowlane start 14</div>
-          <div class="mt-4 space-y-1.5">
-            <div class="text-on-surface-variant">◇ 14 — Implement landingpage</div>
-            <div class="text-on-surface-variant">◇ Branch name: 14-implement-landingpage</div>
-            <div class="text-primary">◇ Pushed: 14-implement-landingpage</div>
+    <div data-reveal data-reveal-delay="0.15">
+      <Terminal title="flowlane start 14" frameClass="aspect-square p-10 md:p-12">
+        <div class="flex flex-col justify-between h-full gap-6">
+          <div>
+            <div class="text-tertiary-fixed-dim">
+              <span class="opacity-50">$ </span><span data-type="flowlane start 14"></span><span class="animate-pulse inline-block w-2 h-4 bg-primary align-middle ml-1"></span>
+            </div>
+            <div class="mt-4 space-y-1.5">
+              <div class="text-on-surface-variant">◇ 14 — Implement landingpage</div>
+              <div class="text-on-surface-variant">◇ Branch name: 14-implement-landingpage</div>
+              <div class="text-primary">◇ Pushed: 14-implement-landingpage</div>
+            </div>
+          </div>
+          <div class="border-t border-outline-variant/10 pt-4 text-[10px] leading-tight">
+            <div class="text-tertiary-fixed-dim">✓ Branch ready!</div>
+            <div class="text-on-surface-variant">Run flowlane pr 14 when you're ready to open a PR.</div>
           </div>
         </div>
-        <div class="border-t border-outline-variant/10 pt-4 text-[10px] leading-tight">
-          <div class="text-tertiary-fixed-dim">✓ Branch ready!</div>
-          <div class="text-on-surface-variant">Run flowlane pr 14 when you're ready to open a PR.</div>
-        </div>
-      </div>
-    </Terminal>
+      </Terminal>
+    </div>
   </div>
 </section>

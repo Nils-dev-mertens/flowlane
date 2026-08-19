@@ -1,0 +1,85 @@
+---
+const groups = [
+  {
+    title: 'Setup',
+    icon: 'construction',
+    color: 'text-secondary',
+    items: [
+      { cmd: 'flowlane init', desc: 'Interactive wizard — platform, org, project, identity, token.' },
+      { cmd: 'flowlane profile list · use · add', desc: 'Manage named config profiles per organisation.' },
+      { cmd: 'flowlane config set baseBranch develop', desc: 'Persist any setting. Dotted keys for providers.' },
+    ],
+  },
+  {
+    title: 'Tickets',
+    icon: 'confirmation_number',
+    color: 'text-primary',
+    items: [
+      { cmd: 'flowlane tickets', desc: 'Browse tickets — --filter, --status, --user, --json.' },
+      { cmd: 'flowlane ticket create --title "..."', desc: 'Create tickets with kind, labels, assignee, parent.' },
+      { cmd: 'flowlane describe 14', desc: 'Ticket summary without leaving the terminal.' },
+    ],
+  },
+  {
+    title: 'Branch & PR',
+    icon: 'fork_right',
+    color: 'text-tertiary',
+    items: [
+      { cmd: 'flowlane start 14', desc: 'Branch from a ticket, pushed to origin, ticket set In Progress.' },
+      { cmd: 'flowlane pr 14', desc: 'Open the PR with the ticket link attached — --draft.' },
+      { cmd: 'flowlane pr review 42', desc: 'Threads, files, inline comments, votes in one session.' },
+      { cmd: 'flowlane pr complete 42', desc: 'Merge with strategy picker — board column auto-updates.' },
+    ],
+  },
+  {
+    title: 'Automation',
+    icon: 'terminal',
+    color: 'text-primary',
+    items: [
+      { cmd: 'flowlane pr list --json | jq ...', desc: 'Every read command emits JSON for scripts and CI.' },
+      { cmd: 'flowlane config set hookAfterPR "open {{prUrl}}"', desc: 'Run shell hooks after start / PR / review.' },
+      { cmd: 'flowlane review 14', desc: 'Move the ticket to In Review for your team.' },
+    ],
+  },
+];
+---
+
+<section class="py-48 px-6 md:px-8 max-w-7xl mx-auto" id="commands">
+  <div class="mb-24 text-center md:text-left" data-reveal>
+    <p class="text-[10px] font-mono uppercase tracking-widest opacity-40 mb-4">Cheat Sheet</p>
+    <h2 class="text-5xl md:text-7xl font-black font-headline uppercase tracking-tighter mb-4">
+      THE <span class="text-primary">COMMAND</span> REFERENCE
+    </h2>
+    <p class="text-on-surface-variant tracking-widest text-xs uppercase font-bold">Setup · Tickets · PRs · Automation</p>
+  </div>
+
+  <div class="grid lg:grid-cols-2 gap-8" data-reveal-group>
+    {
+      groups.map((group) => (
+        <div class="bg-surface-container border border-outline-variant/10">
+          <div class="px-8 py-5 border-b border-outline-variant/10 flex items-center gap-4">
+            <span class:list={['material-symbols-outlined text-2xl', group.color]} style="font-variation-settings: 'FILL' 1;">
+              {group.icon}
+            </span>
+            <h3 class="font-headline font-bold uppercase tracking-widest text-sm">{group.title}</h3>
+          </div>
+          <div class="divide-y divide-outline-variant/10">
+            {
+              group.items.map((item) => (
+                <div class="px-8 py-5 flex flex-col gap-2 hover:bg-surface-container-high/50 transition-colors">
+                  <code class="term-line text-secondary text-xs break-all">{item.cmd}</code>
+                  <p class="text-sm text-on-surface-variant leading-relaxed">{item.desc}</p>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      ))
+    }
+  </div>
+
+  <p class="mt-12 text-center text-on-surface-variant font-mono text-xs opacity-60">
+    Tip: run <code class="text-secondary">flowlane --help</code> for the full list, or
+    <code class="text-secondary">flowlane &lt;command&gt; --help</code> for any single command.
+  </p>
+</section>

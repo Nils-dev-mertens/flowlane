@@ -3,10 +3,12 @@ import '../styles/global.css';
 import Nav from '../components/Nav.astro';
 import Hero from '../components/Hero.astro';
 import Story from '../components/Story.astro';
+import Workflow from '../components/Workflow.astro';
 import Features from '../components/Features.astro';
 import Integrations from '../components/Integrations.astro';
 import Install from '../components/Install.astro';
 import Configure from '../components/Configure.astro';
+import Commands from '../components/Commands.astro';
 import Community from '../components/Community.astro';
 import CTA from '../components/CTA.astro';
 import Footer from '../components/Footer.astro';
@@ -28,6 +30,7 @@ import Footer from '../components/Footer.astro';
       content="Command-line workflow automation for Azure DevOps, GitHub, and Jira. Open source, MIT licensed, free forever."
     />
     <meta property="og:type" content="website" />
+    <meta name="theme-color" content="#15121a" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -39,19 +42,32 @@ import Footer from '../components/Footer.astro';
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
       rel="stylesheet"
     />
+    <script is:inline>
+      document.documentElement.classList.add('js');
+    </script>
   </head>
   <body id="top" class="selection:bg-primary-container selection:text-on-primary-container">
+    <div
+      id="scroll-progress"
+      class="fixed top-0 left-0 right-0 h-0.5 bg-primary-container z-[60] pointer-events-none"
+      aria-hidden="true"
+    ></div>
     <Nav />
     <main class="grid-bg">
       <Hero />
       <Story />
+      <Workflow />
       <Features />
       <Integrations />
       <Install />
       <Configure />
+      <Commands />
       <Community />
       <CTA />
     </main>
     <Footer />
+    <script>
+      import '../scripts/motion.js';
+    </script>
   </body>
 </html>
