@@ -1,0 +1,52 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+---
+
+<DocsLayout title="Documentation — flowlane" description="flowlane CLI docs: install, configuration, providers, and full command reference.">
+  <h1>Documentation</h1>
+  <p>
+    flowlane automates the architecture of your workflow: tickets, branches, and pull requests for Azure
+    DevOps, GitHub, and Jira — without leaving the terminal. Everything below is maintained alongside the
+    source in this repo.
+  </p>
+
+  <h2>Getting started</h2>
+  <p>
+    One global install, one interactive wizard, then flow. <code>npm install -g flowlane</code>, run
+    <code>flowlane init</code>, and flowlane writes its config to <code>~/.config/flowlane/config.json</code>.
+  </p>
+
+  <h3>Quick links</h3>
+  <ul>
+    <li><a href="/docs/install">Install &amp; prerequisites</a> — Node 18+, git, tokens, first setup.</li>
+    <li><a href="/docs/adding-a-provider">Add a provider</a> — extend flowlane to your own platform.</li>
+    <li><a href="/docs/reference">Command reference</a> — the full CLI surface.</li>
+    <li><a href="/license">License</a> — MIT, free forever.</li>
+  </ul>
+
+  <h2>The workflow</h2>
+  <p>
+    flowlane separates <strong>ticketing</strong> from <strong>pull requests / VCS</strong>, so ticket and PR
+    providers are configured independently. Pair Jira ticketing with GitHub PRs, or Azure DevOps end-to-end.
+  </p>
+  <pre><code>flowlane start 14        # branch from a ticket, pushed to origin
+flowlane pr 14           # PR with the ticket link attached
+flowlane pr review 42    # threads, files, inline comments, votes
+flowlane pr complete 42  # merge — board column auto-updates</code></pre>
+
+  <h2>Configuration</h2>
+  <p>
+    Profiles keep separate credentials per organisation. A <code>.flowlane</code> file in a repository
+    overrides the global profile for that repo. Every setting is a <code>flowlane config set</code> away, and
+    post-action hooks can open the PR, ping Slack, or launch your editor.
+  </p>
+
+  <blockquote>
+    "The terminal is where developers are most productive. Don't force them out of it."
+  </blockquote>
+
+  <p>
+    Something missing? The docs are open source — contribute corrections on
+    <a href="https://github.com/Nils-dev-mertens/flowlane" target="_blank" rel="noreferrer">GitHub</a>.
+  </p>
+</DocsLayout>

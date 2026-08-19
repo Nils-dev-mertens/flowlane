@@ -1,0 +1,111 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = 'Documentation — flowlane',
+  description = 'flowlane CLI documentation: install, configuration, providers, and command reference.',
+} = Astro.props;
+
+const links = [
+  { href: '/docs', label: 'Overview' },
+  { href: '/docs/install', label: 'Install' },
+  { href: '/docs/adding-a-provider', label: 'Add a Provider' },
+  { href: '/docs/reference', label: 'Reference' },
+  { href: '/license', label: 'License' },
+];
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#15121a" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="selection:bg-primary-container selection:text-on-primary-container">
+    <header class="fixed top-0 w-full z-50 bg-[#15121a]/80 backdrop-blur-xl">
+      <div class="flex justify-between items-center px-6 md:px-8 py-4">
+        <a href="/" class="text-xl font-bold tracking-tighter text-[#ffb4aa] font-headline uppercase">
+          FLOWLANE <span class="text-[#e7e0ec]/50 text-xs font-normal normal-case">/ docs</span>
+        </a>
+        <nav class="hidden md:flex items-center space-x-7 xl:space-x-9">
+          {
+            links.map((link) => (
+              <a
+                href={link.href}
+                class="text-[#e7e0ec] hover:text-[#ffb4aa] transition-colors duration-200 font-headline uppercase tracking-tight text-xs"
+              >
+                {link.label}
+              </a>
+            ))
+          }
+        </nav>
+        <a
+          href="/#install"
+          class="bg-primary-container text-on-primary-container px-5 py-2 text-xs font-bold font-headline uppercase tracking-widest active:scale-95 transition-transform"
+        >
+          Get Started
+        </a>
+      </div>
+    </header>
+
+    <main class="pt-28 pb-28 px-6 md:px-8">
+      <div class="max-w-3xl mx-auto markdown">
+        <slot />
+      </div>
+    </main>
+
+    <footer class="w-full py-10 px-6 md:px-8 flex flex-col md:flex-row justify-between items-center gap-6 bg-surface-container-low">
+      <div>
+        <div class="text-lg font-black text-[#ffb4aa] font-headline uppercase tracking-tight mb-2">FLOWLANE</div>
+        <p class="text-[#e7e0ec]/60 font-headline text-[10px] tracking-widest uppercase">© docs · MIT</p>
+      </div>
+      <div class="flex flex-wrap gap-7 justify-center">
+        {
+          links.map((link) => (
+            <a
+              href={link.href}
+              class="font-headline text-xs tracking-widest uppercase text-[#e7e0ec]/60 hover:text-[#ffb4aa] underline underline-offset-4 transition-colors"
+            >
+              {link.label}
+            </a>
+          ))
+        }
+        <a
+          href="https://github.com/Nils-dev-mertens/flowlane"
+          target="_blank"
+          rel="noreferrer"
+          class="font-headline text-xs tracking-widest uppercase text-[#e7e0ec]/60 hover:text-[#ffb4aa] underline underline-offset-4 transition-colors"
+        >
+          GitHub
+        </a>
+        <a
+          href="https://www.npmjs.com/package/flowlane"
+          target="_blank"
+          rel="noreferrer"
+          class="font-headline text-xs tracking-widest uppercase text-[#e7e0ec]/60 hover:text-[#ffb4aa] underline underline-offset-4 transition-colors"
+        >
+          npm
+        </a>
+      </div>
+    </footer>
+  </body>
+</html>

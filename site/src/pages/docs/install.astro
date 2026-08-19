@@ -1,0 +1,16 @@
+---
+import { readFileSync } from 'node:fs';
+import { createMarkdownProcessor } from '@astrojs/markdown-remark';
+import DocsLayout from '../../layouts/DocsLayout.astro';
+
+const src = readFileSync(new URL('../../../../INSTALL.md', import.meta.url), 'utf-8');
+const processor = await createMarkdownProcessor({
+  syntaxHighlight: 'shiki',
+  shikiConfig: { theme: 'dark-plus' },
+});
+const { code } = await processor.render(src);
+---
+
+<DocsLayout title="Install — flowlane" description="Install flowlane: prerequisites, build, link, and first use.">
+  <Fragment set:html={code} />
+</DocsLayout>
