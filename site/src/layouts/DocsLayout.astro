@@ -31,11 +31,20 @@ const docLinks = [
 
 const isActive = (href: string) => href === current;
 
+const decodeHtml = (s: string) =>
+  s.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (m, code: string) => {
+    if (code[0] === '#') {
+      const hex = code[1] === 'x' || code[1] === 'X';
+      return String.fromCharCode(parseInt(code.slice(hex ? 2 : 1), hex ? 16 : 10));
+    }
+    return { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' }[code] ?? m;
+  });
+
 const toc = html
   ? [...html.matchAll(/<h([23]) id="([^"]+)"[^>]*>(.*?)<\/h\1>/g)].map((m) => ({
       level: Number(m[1]),
       id: m[2],
-      text: m[3].replace(/<[^>]+>/g, ''),
+      text: decodeHtml(m[3].replace(/<[^>]+>/g, '')),
     }))
   : [];
 
