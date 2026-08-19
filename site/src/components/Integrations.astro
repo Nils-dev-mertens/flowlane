@@ -43,19 +43,21 @@ const providers = [
       <div class="relative" data-reveal data-reveal-delay="0.15">
         <div class="absolute -inset-4 border border-primary/20" aria-hidden="true"></div>
         <Terminal title="flowlane config list" frameClass="relative border border-outline-variant/20">
-          <div class="text-tertiary-fixed-dim">$ flowlane config list</div>
-          <div class="mt-3 pl-4 border-l border-outline-variant/20 space-y-1.5">
-            <div class="flex justify-between">
-              <span>Active config — profile: work</span>
-              <span class="text-primary">OK</span>
+          <div data-reveal-group>
+            <div class="text-tertiary-fixed-dim">$ flowlane config list</div>
+            <div class="mt-3 pl-4 border-l border-outline-variant/20 space-y-1.5">
+              <div class="flex justify-between">
+                <span>Active config — profile: work</span>
+                <span class="text-primary">OK</span>
+              </div>
+              <div class="flex justify-between"><span>[01] ticketProvider</span> <span class="text-primary">jira</span></div>
+              <div class="flex justify-between"><span>[02] vcsProvider</span> <span class="text-primary">github</span></div>
+              <div class="flex justify-between"><span>[03] github.owner</span> <span class="text-on-surface-variant">Nils-dev-mertens</span></div>
+              <div class="flex justify-between"><span>[04] jira.site</span> <span class="text-on-surface-variant">acme.atlassian.net</span></div>
             </div>
-            <div class="flex justify-between"><span>[01] ticketProvider</span> <span class="text-primary">jira</span></div>
-            <div class="flex justify-between"><span>[02] vcsProvider</span> <span class="text-primary">github</span></div>
-            <div class="flex justify-between"><span>[03] github.owner</span> <span class="text-on-surface-variant">Nils-dev-mertens</span></div>
-            <div class="flex justify-between"><span>[04] jira.site</span> <span class="text-on-surface-variant">acme.atlassian.net</span></div>
+            <div class="mt-3 text-secondary-fixed-dim">Successfully synced 2 environments.</div>
+            <div class="inline-block w-2 h-4 bg-primary"></div>
           </div>
-          <div class="mt-3 text-secondary-fixed-dim">Successfully synced 2 environments.</div>
-          <div class="inline-block w-2 h-4 bg-primary"></div>
         </Terminal>
       </div>
     </div>

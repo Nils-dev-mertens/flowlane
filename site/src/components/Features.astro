@@ -84,22 +84,24 @@ import Terminal from './Terminal.astro';
     <div class="md:col-span-8 bg-surface-container-lowest p-12 flex items-center gap-12 border border-outline-variant/20 group hover:border-primary/40 transition-colors">
       <div class="hidden md:block w-2/5">
         <Terminal title="flowlane tickets">
-          <div class="text-tertiary-fixed-dim">$ flowlane tickets</div>
-          <div class="mt-3 space-y-1.5">
-            <div class="flex justify-between">
-              <span class="text-on-surface">[14] Implement landingpage</span>
-              <span class="text-primary">TODO</span>
+          <div data-reveal-group>
+            <div class="text-tertiary-fixed-dim">$ flowlane tickets</div>
+            <div class="mt-3 space-y-1.5">
+              <div class="flex justify-between">
+                <span class="text-on-surface">[14] Implement landingpage</span>
+                <span class="text-primary">TODO</span>
+              </div>
+              <div class="flex justify-between opacity-60">
+                <span>[11] Stabilize GitHub PR auth</span>
+                <span class="text-tertiary-fixed-dim">ACTIVE</span>
+              </div>
+              <div class="flex justify-between opacity-40">
+                <span>[9] Add Jira ticket creation</span>
+                <span class="text-tertiary-fixed-dim">ACTIVE</span>
+              </div>
             </div>
-            <div class="flex justify-between opacity-60">
-              <span>[11] Stabilize GitHub PR auth</span>
-              <span class="text-tertiary-fixed-dim">ACTIVE</span>
-            </div>
-            <div class="flex justify-between opacity-40">
-              <span>[9] Add Jira ticket creation</span>
-              <span class="text-tertiary-fixed-dim">ACTIVE</span>
-            </div>
+            <div class="mt-4 inline-block w-2 h-4 bg-primary"></div>
           </div>
-          <div class="mt-4 inline-block w-2 h-4 bg-primary"></div>
         </Terminal>
       </div>
       <div class="flex-1">
@@ -112,6 +114,19 @@ import Terminal from './Terminal.astro';
           account, no billing page, no gates.
         </p>
       </div>
+    </div>
+
+    <!-- Small: Ticket Creation -->
+    <div class="md:col-span-4 bg-surface-container-high p-8 flex flex-col justify-between border border-outline-variant/10">
+      <div>
+        <span class="material-symbols-outlined text-3xl text-secondary mb-6" style="font-variation-settings: 'FILL' 1;">playlist_add</span>
+        <h3 class="text-xl font-bold font-headline mb-3 uppercase">Ticket Creation</h3>
+        <p class="text-sm text-on-surface-variant">
+          <code class="text-secondary">flowlane ticket create --title "..." --kind bug</code>{' '}
+          — create tickets with kind, labels, assignee, and parent without opening the browser.
+        </p>
+      </div>
+      <div class="mt-6 text-[10px] font-mono uppercase opacity-40">Create · Kind · Labels · Assignee</div>
     </div>
   </div>
 </section>

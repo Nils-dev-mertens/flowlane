@@ -3,7 +3,7 @@ import { animate, inView, motionValue, scroll, stagger } from 'motion';
 const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const easeOut = [0.22, 1, 0.36, 1];
 
-// Hero: pointer-driven parallax, interactive grid, and magnetic CTAs.
+// Hero: pointer-driven parallax and magnetic CTAs.
 const hero = document.getElementById('hero');
 if (hero && !reduce) {
   const layerDefs = [
@@ -90,23 +90,84 @@ if (reduce) {
     );
   });
 
-  // Typewriter effect for `data-type="text to type"` elements.
-  document.querySelectorAll('[data-type]').forEach((el) => {
-    const text = el.dataset.type || '';
-    inView(
-      el,
-      () => {
-        el.textContent = '';
-        animate(0, text.length, {
-          duration: 1.6,
-          ease: 'linear',
-          onUpdate: (v) => {
-            el.textContent = text.slice(0, Math.round(v));
-          },
+  // Terminal streaming: type each command line and reveal its output when the
+  // terminal scrolls into view. Replays every time it re-enters the viewport.
+  document.querySelectorAll('[data-stream]').forEach((root) => {
+    const cmds = Array.from(root.querySelectorAll('.term-cmd-line'));
+    const typed = cmds.map((c) => c.querySelector('[data-type]'));
+    const outs = Array.from(root.querySelectorAll('.term-out'));
+    const groups = cmds.map(() => []);
+
+    let lastIdx = -1;
+    const ordered = Array.from(root.querySelectorAll('.term-cmd-line, .term-out'));
+    for (const el of ordered) {
+      if (el.classList.contains('term-cmd-line')) {
+        lastIdx = cmds.indexOf(el);
+      } else if (lastIdx >= 0) {
+        groups[lastIdx].push(el);
+      }
+    }
+
+    const startState = () => {
+      typed.forEach((t) => {
+        if (t) t.textContent = '';
+      });
+      cmds.forEach((c) => c.classList.remove('active'));
+      outs.forEach((o) => {
+        o.style.opacity = '0';
+        o.style.transform = 'translateY(6px)';
+      });
+    };
+
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    let playing = false;
+
+    const play = async () => {
+      if (playing) return;
+      playing = true;
+      startState();
+      for (let i = 0; i < cmds.length; i++) {
+        cmds[i].classList.add('active');
+        const t = typed[i];
+        const text = t ? t.dataset.type || '' : '';
+        if (t && text) {
+          await new Promise((resolve) => {
+            animate(0, text.length, {
+              duration: Math.max(0.45, text.length * 0.045),
+              ease: 'linear',
+              onUpdate: (v) => {
+                t.textContent = text.slice(0, Math.round(v));
+              },
+              onComplete: resolve,
+            });
+          });
+        }
+        await sleep(220);
+        const group = groups[i] || [];
+        await new Promise((resolve) => {
+          animate(group, { opacity: [0, 1], y: [6, 0] }, {
+            duration: 0.35,
+            ease: easeOut,
+            onComplete: resolve,
+          });
+        });
+        cmds[i].classList.remove('active');
+        if (i === cmds.length - 1) cmds[i].classList.add('active');
+      }
+      playing = false;
+    };
+
+    startState();
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) play();
         });
       },
-      { margin: '-40px 0px -40px 0px' }
+      { threshold: 0.3 }
     );
+    io.observe(root);
   });
 }
 

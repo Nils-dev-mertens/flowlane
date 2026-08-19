@@ -63,27 +63,29 @@ const prereqs = ['Node.js 18+', 'git on PATH', 'Azure DevOps PAT (or az-cli)', '
     </div>
 
     <Terminal title="flowlane init" frameClass="lg:sticky lg:top-24" data-reveal data-reveal-delay="0.15">
-      <div class="text-tertiary-fixed-dim">$ flowlane init</div>
-      <div class="mt-4 space-y-3">
-        <div>
-          <div class="text-on-surface-variant">◇ Select your ticket provider</div>
-          <div class="pl-4 text-primary">› Azure DevOps · GitHub · Jira</div>
+      <div data-reveal-group>
+        <div class="text-tertiary-fixed-dim">$ flowlane init</div>
+        <div class="mt-4 space-y-3">
+          <div>
+            <div class="text-on-surface-variant">◇ Select your ticket provider</div>
+            <div class="pl-4 text-primary">› Azure DevOps · GitHub · Jira</div>
+          </div>
+          <div>
+            <div class="text-on-surface-variant">◇ Select your PR provider</div>
+            <div class="pl-4 text-primary">› GitHub</div>
+          </div>
+          <div>
+            <div class="text-on-surface-variant">◇ Organisation</div>
+            <div class="pl-4 text-primary">› Nils-dev-mertens</div>
+          </div>
+          <div>
+            <div class="text-on-surface-variant">◇ Token</div>
+            <div class="pl-4 text-on-surface-variant">••••••••••••</div>
+          </div>
+          <div class="text-tertiary-fixed-dim">✓ Profile "work" saved to ~/.config/flowlane/config.json</div>
         </div>
-        <div>
-          <div class="text-on-surface-variant">◇ Select your PR provider</div>
-          <div class="pl-4 text-primary">› GitHub</div>
-        </div>
-        <div>
-          <div class="text-on-surface-variant">◇ Organisation</div>
-          <div class="pl-4 text-primary">› Nils-dev-mertens</div>
-        </div>
-        <div>
-          <div class="text-on-surface-variant">◇ Token</div>
-          <div class="pl-4 text-on-surface-variant">••••••••••••</div>
-        </div>
-        <div class="text-tertiary-fixed-dim">✓ Profile "work" saved to ~/.config/flowlane/config.json</div>
+        <div class="inline-block w-2 h-4 bg-primary"></div>
       </div>
-      <div class="inline-block w-2 h-4 bg-primary"></div>
     </Terminal>
   </div>
 </section>

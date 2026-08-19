@@ -53,8 +53,9 @@ const cards = [
     </div>
 
     <Terminal title="~/.config/flowlane/config.json" frameClass="lg:sticky lg:top-24" data-reveal data-reveal-delay="0.15">
-      <div class="text-on-surface-variant">$ flowlane config list --json</div>
-      <pre class="mt-4 text-secondary-fixed-dim leading-relaxed overflow-x-auto">{`{
+      <div data-reveal-group>
+        <div class="text-on-surface-variant">$ flowlane config list --json</div>
+        <pre class="mt-4 text-secondary-fixed-dim leading-relaxed overflow-x-auto">{`{
   "activeProfile": "work",
   "profiles": {
     "work": {
@@ -75,7 +76,8 @@ const cards = [
     }
   }
 }`}</pre>
-      <div class="inline-block w-2 h-4 bg-primary"></div>
+        <div class="inline-block w-2 h-4 bg-primary"></div>
+      </div>
     </Terminal>
   </div>
 </section>

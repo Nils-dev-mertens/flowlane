@@ -91,23 +91,29 @@ const steps = [
       </div>
 
       <Terminal title="flowlane" frameClass="border border-outline-variant/20">
-        <div class="text-tertiary-fixed-dim">
-          <span class="opacity-50">$ </span><span data-type="flowlane start 14"></span><span class="inline-block w-2 h-4 bg-primary align-middle ml-1"></span>
-        </div>
-        <div class="mt-4 space-y-1.5">
-          <div class="text-on-surface-variant">◇ Branch created &amp; pushed: 14-implement-landingpage</div>
-          <div class="text-on-surface-variant">◇ Ticket 14 moved to In Progress</div>
-        </div>
-        <div class="mt-5 border-t border-outline-variant/10 pt-4 space-y-1.5">
-          <div class="text-tertiary-fixed-dim">$ flowlane pr 14</div>
-          <div class="text-primary">✓ PR #42 opened — draft, link to 14 attached</div>
-        </div>
-        <div class="mt-5 border-t border-outline-variant/10 pt-4 space-y-1.5">
-          <div class="text-tertiary-fixed-dim">$ flowlane pr complete 42</div>
-          <div class="text-primary">✓ Merged — 14 moved to Done</div>
-        </div>
-        <div class="mt-5 border-t border-outline-variant/10 pt-4 text-tertiary-fixed-dim">
-          Session: ticket to merged PR in 3 commands · 0 browser tabs
+        <div data-stream>
+          <div class="term-cmd-line text-tertiary-fixed-dim">
+            <span class="opacity-50">$ </span><span data-type="flowlane start 14">flowlane start 14</span>
+          </div>
+          <div class="term-out mt-4 space-y-1.5">
+            <div class="text-on-surface-variant">◇ Branch created &amp; pushed: 14-implement-landingpage</div>
+            <div class="text-on-surface-variant">◇ Ticket 14 moved to In Progress</div>
+          </div>
+          <div class="term-cmd-line text-tertiary-fixed-dim mt-5 border-t border-outline-variant/10 pt-4">
+            <span class="opacity-50">$ </span><span data-type="flowlane pr 14">flowlane pr 14</span>
+          </div>
+          <div class="term-out mt-4 space-y-1.5">
+            <div class="text-primary">✓ PR #42 opened — draft, link to 14 attached</div>
+          </div>
+          <div class="term-cmd-line text-tertiary-fixed-dim mt-5 border-t border-outline-variant/10 pt-4">
+            <span class="opacity-50">$ </span><span data-type="flowlane pr complete 42">flowlane pr complete 42</span>
+          </div>
+          <div class="term-out mt-4 space-y-1.5">
+            <div class="text-primary">✓ Merged — 14 moved to Done</div>
+          </div>
+          <div class="term-out mt-5 border-t border-outline-variant/10 pt-4 text-tertiary-fixed-dim">
+            Session: ticket to merged PR in 3 commands · 0 browser tabs
+          </div>
         </div>
       </Terminal>
     </div>

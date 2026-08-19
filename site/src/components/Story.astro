@@ -31,18 +31,18 @@ import Terminal from './Terminal.astro';
 
     <div data-reveal data-reveal-delay="0.15">
       <Terminal title="flowlane start 14" frameClass="aspect-square p-10 md:p-12">
-        <div class="flex flex-col justify-between h-full gap-6">
+        <div class="flex flex-col justify-between h-full gap-6" data-stream>
           <div>
-            <div class="text-tertiary-fixed-dim">
-              <span class="opacity-50">$ </span><span data-type="flowlane start 14"></span><span class="inline-block w-2 h-4 bg-primary align-middle ml-1"></span>
+            <div class="term-cmd-line text-tertiary-fixed-dim">
+              <span class="opacity-50">$ </span><span data-type="flowlane start 14">flowlane start 14</span>
             </div>
-            <div class="mt-4 space-y-1.5">
+            <div class="term-out mt-4 space-y-1.5">
               <div class="text-on-surface-variant">◇ 14 — Implement landingpage</div>
               <div class="text-on-surface-variant">◇ Branch name: 14-implement-landingpage</div>
               <div class="text-primary">◇ Pushed: 14-implement-landingpage</div>
             </div>
           </div>
-          <div class="border-t border-outline-variant/10 pt-4 text-[10px] leading-tight">
+          <div class="term-out border-t border-outline-variant/10 pt-4 text-[10px] leading-tight">
             <div class="text-tertiary-fixed-dim">✓ Branch ready!</div>
             <div class="text-on-surface-variant">Run flowlane pr 14 when you're ready to open a PR.</div>
           </div>

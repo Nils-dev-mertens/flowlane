@@ -148,6 +148,33 @@ body::before {
   }
 }
 
+/* Terminal command lines: a hard-blinking block cursor appears on the active line */
+.term-cmd-line {
+  position: relative;
+}
+
+.term-cmd-line.active::after {
+  content: '';
+  display: inline-block;
+  width: 0.5rem;
+  height: 1rem;
+  margin-left: 0.25rem;
+  vertical-align: text-bottom;
+  background: #ff5545;
+  animation: term-blink 1s steps(1) infinite;
+}
+
+@keyframes term-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
 /* Hero index tiles: 01 / 02 / 03. Outlined blueprint numerals that invert to
    signal red on hover while the tile fills from the bottom. */
 .stat-tile {
@@ -206,6 +233,10 @@ body::before {
 @media (prefers-reduced-motion: reduce) {
   .hero-frame-a,
   .hero-frame-b {
+    animation: none;
+  }
+
+  .term-cmd-line.active::after {
     animation: none;
   }
 
