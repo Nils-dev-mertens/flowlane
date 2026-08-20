@@ -17,4 +17,12 @@ export interface ITicketService {
   addComment(id: string, text: string): Promise<TicketComment>;
   /** List comments on a ticket, oldest first. */
   getComments(id: string): Promise<TicketComment[]>;
+  /** Move the ticket to its closed/completed state (providers map to their own closed state). */
+  closeTicket(id: string): Promise<void>;
+  /** Reopen a previously closed ticket. */
+  reopenTicket(id: string): Promise<void>;
+  /** Add labels/tags to a ticket, preserving existing ones where the provider supports it. */
+  addLabels(id: string, labels: string[]): Promise<void>;
+  /** Assign/reassign a ticket to a user. */
+  assignTicket(id: string, assignee: string): Promise<void>;
 }

@@ -102,6 +102,38 @@ export class JiraTicketService implements ITicketService {
     );
   }
 
+  /**
+   * Transition a Jira issue to the first transition matching `predicate`.
+   * Used by close/reopen where the target status name varies between projects.
+   */
+  private async transitionTo(
+    id: string,
+    predicate: (t: JiraTransition) => boolean,
+    description: string,
+  ): Promise<void> {
+    const transitions = await this.api.request<{ transitions?: JiraTransition[] }>(
+      'GET',
+      `/issue/${encodeURIComponent(id)}/transitions`,
+    );
+
+    const target = (transitions.transitions ?? []).find(predicate);
+    if (!target) {
+      const available = (transitions.transitions ?? [])
+        .map((t) => t.to?.name ?? t.name)
+        .filter(Boolean);
+      throw new JiraApiError(
+        `Jira has no transition to ${description}. ` +
+        `Available transitions: ${available.length ? available.join(', ') : 'none'}.`,
+      );
+    }
+
+    await this.api.request(
+      'POST',
+      `/issue/${encodeURIComponent(id)}/transitions`,
+      { transition: { id: target.id } },
+    );
+  }
+
   async createTicket(params: CreateTicketParams): Promise<Ticket> {
     const issueType = this.resolveIssueType(params);
 
@@ -146,6 +178,45 @@ export class JiraTicketService implements ITicketService {
     return (page.comments ?? [])
       .map((comment) => this.toComment(comment))
       .sort((a, b) => a.publishedAt.getTime() - b.publishedAt.getTime());
+  }
+
+  async closeTicket(id: string): Promise<void> {
+    await this.transitionTo(
+      id,
+      (t) =>
+        (t.to?.name ?? t.name ?? '').toLowerCase() === 'done' ||
+        t.to?.statusCategory?.key === 'done',
+      'Done (closed)',
+    );
+  }
+
+  async reopenTicket(id: string): Promise<void> {
+    await this.transitionTo(
+      id,
+      (t) => t.to?.statusCategory?.key === 'new' || t.to?.statusCategory?.key === 'indeterminate',
+      'an open status',
+    );
+  }
+
+  async addLabels(id: string, labels: string[]): Promise<void> {
+    const issue = await this.api.request<JiraIssue>(
+      'GET',
+      `/issue/${encodeURIComponent(id)}?fields=labels`,
+    );
+    const existing = Array.isArray(issue.fields?.labels)
+      ? (issue.fields.labels as string[])
+      : [];
+    const merged = [...new Set([...existing, ...labels])];
+    await this.api.request('PUT', `/issue/${encodeURIComponent(id)}`, {
+      fields: { labels: merged },
+    });
+  }
+
+  async assignTicket(id: string, assignee: string): Promise<void> {
+    const accountId = await this.resolveAccountId(assignee);
+    await this.api.request('PUT', `/issue/${encodeURIComponent(id)}`, {
+      fields: { assignee: { id: accountId } },
+    });
   }
 
   // ── helpers ────────────────────────────────────────────────────────────────
@@ -209,7 +280,7 @@ export class JiraTicketService implements ITicketService {
 interface JiraTransition {
   id: string;
   name?: string;
-  to?: { name?: string };
+  to?: { name?: string; statusCategory?: { key?: string; name?: string } };
 }
 
 interface JiraComment {

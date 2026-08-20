@@ -112,6 +112,31 @@ export class GitHubTicketService implements ITicketService {
       .sort((a, b) => a.publishedAt.getTime() - b.publishedAt.getTime());
   }
 
+  async closeTicket(id: string): Promise<void> {
+    await this.updateStatus(id, 'Closed');
+  }
+
+  async reopenTicket(id: string): Promise<void> {
+    await this.updateStatus(id, 'Open');
+  }
+
+  async addLabels(id: string, labels: string[]): Promise<void> {
+    await this.api.request(
+      'POST',
+      this.path(`/issues/${encodeURIComponent(id)}/labels`),
+      { labels },
+    );
+  }
+
+  async assignTicket(id: string, assignee: string): Promise<void> {
+    const login = await this.resolveAssignee(assignee);
+    await this.api.request(
+      'PATCH',
+      this.path(`/issues/${encodeURIComponent(id)}`),
+      { assignees: [login] },
+    );
+  }
+
   private async resolveAssignee(user: string): Promise<string> {
     const configuredUser = user.trim();
 
