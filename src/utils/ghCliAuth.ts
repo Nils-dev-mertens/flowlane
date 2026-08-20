@@ -1,5 +1,3 @@
-import { execSync } from 'child_process';
-
 /**
  * Obtain a token from the GitHub CLI.
  * Requires the user to be signed in via `gh auth login`.
@@ -7,7 +5,9 @@ import { execSync } from 'child_process';
  */
 export function getGhCliToken(): string {
   try {
-    const token = execSync('gh auth token', {
+    // `require` at call time (not a destructured import) so tests can mock
+    // child_process.execSync and the CLI stays a thin git/gh wrapper.
+    const token = require('child_process').execSync('gh auth token', {
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim();

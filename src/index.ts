@@ -74,6 +74,26 @@ ticketCmd
     await ticketCreateCommand(opts);
   });
 
+ticketCmd
+  .command('comment <ticketId> <text>')
+  .description('Add a comment to a ticket')
+  .option('--json', 'Output the created comment as JSON')
+  .action(async (ticketId: string, text: string, opts: { json?: boolean }) => {
+    await ensureConfig();
+    const { ticketCommentCommand } = await import('./commands/ticketComment');
+    await ticketCommentCommand(ticketId, text, opts);
+  });
+
+ticketCmd
+  .command('comments <ticketId>')
+  .description('List comments on a ticket')
+  .option('--json', 'Output comments as JSON')
+  .action(async (ticketId: string, opts: { json?: boolean }) => {
+    await ensureConfig();
+    const { ticketCommentsCommand } = await import('./commands/ticketComment');
+    await ticketCommentsCommand(ticketId, opts);
+  });
+
 // ── branch ────────────────────────────────────────────────────────────────────
 
 program

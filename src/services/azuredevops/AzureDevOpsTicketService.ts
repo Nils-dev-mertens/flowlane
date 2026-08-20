@@ -1,10 +1,10 @@
 import { injectable, inject } from 'tsyringe';
 import * as azdev from 'azure-devops-node-api';
 import type { IWorkItemTrackingApi } from 'azure-devops-node-api/WorkItemTrackingApi';
-import type { WorkItem } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
+import type { Comment as AzWorkItemComment, WorkItem } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
 import type { ITicketService } from '../interfaces/ITicketService';
 import type { IConfigService } from '../interfaces/IConfigService';
-import type { CreateTicketParams, Ticket, TicketKind } from '../../types';
+import type { CreateTicketParams, Ticket, TicketComment, TicketKind } from '../../types';
 import { TOKENS } from '../../tokens';
 import { getAzCliToken } from '../../utils/azCliAuth';
 import { extractApiError, stripHtml } from './mappers';
@@ -216,6 +216,28 @@ export class AzureDevOpsTicketService implements ITicketService {
     }
   }
 
+  async addComment(id: string, text: string): Promise<TicketComment> {
+    const api = await this.api();
+    try {
+      const comment = await api.addComment({ text }, this.project, parseInt(id, 10));
+      return this.toComment(comment);
+    } catch (err: unknown) {
+      throw new Error(extractApiError(err));
+    }
+  }
+
+  async getComments(id: string): Promise<TicketComment[]> {
+    const api = await this.api();
+    try {
+      const list = await api.getComments(this.project, parseInt(id, 10), 100);
+      return (list.comments ?? [])
+        .map((comment) => this.toComment(comment))
+        .sort((a, b) => a.publishedAt.getTime() - b.publishedAt.getTime());
+    } catch (err: unknown) {
+      throw new Error(extractApiError(err));
+    }
+  }
+
   // ── helpers ────────────────────────────────────────────────────────────────
 
   private async api(): Promise<IWorkItemTrackingApi> {
@@ -270,6 +292,16 @@ export class AzureDevOpsTicketService implements ITicketService {
       assignee:    typeof assignee === 'object' ? assignee?.displayName : assignee,
       parentId:    f['System.Parent'] != null ? String(f['System.Parent']) : undefined,
       description: rawDescription ? stripHtml(rawDescription) : undefined,
+    };
+  }
+
+  private toComment(comment: AzWorkItemComment): TicketComment {
+    const author = comment.createdBy as { displayName?: string; uniqueName?: string } | undefined;
+    return {
+      id:          String(comment.id),
+      author:      author?.displayName ?? author?.uniqueName ?? 'Unknown',
+      content:     comment.text ?? '',
+      publishedAt: comment.createdDate ?? new Date(0),
     };
   }
 }

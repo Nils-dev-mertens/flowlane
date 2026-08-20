@@ -1,7 +1,7 @@
 import { injectable, inject } from 'tsyringe';
 import type { ITicketService } from '../interfaces/ITicketService';
 import type { IConfigService } from '../interfaces/IConfigService';
-import type { CreateTicketParams, Ticket, TicketKind } from '../../types';
+import type { CreateTicketParams, Ticket, TicketComment, TicketKind } from '../../types';
 import { TOKENS } from '../../tokens';
 import { JiraApiClient, JiraApiError, type JiraIssue } from './JiraApiClient';
 
@@ -129,6 +129,25 @@ export class JiraTicketService implements ITicketService {
     return this.toTicket(created);
   }
 
+  async addComment(id: string, text: string): Promise<TicketComment> {
+    const comment = await this.api.request<JiraComment>(
+      'POST',
+      `/issue/${encodeURIComponent(id)}/comment`,
+      { body: textToAdf(text) },
+    );
+    return this.toComment(comment);
+  }
+
+  async getComments(id: string): Promise<TicketComment[]> {
+    const page = await this.api.request<{ comments?: JiraComment[] }>(
+      'GET',
+      `/issue/${encodeURIComponent(id)}/comment`,
+    );
+    return (page.comments ?? [])
+      .map((comment) => this.toComment(comment))
+      .sort((a, b) => a.publishedAt.getTime() - b.publishedAt.getTime());
+  }
+
   // ── helpers ────────────────────────────────────────────────────────────────
 
   private resolveIssueType(params: CreateTicketParams): string {
@@ -174,6 +193,15 @@ export class JiraTicketService implements ITicketService {
       ...(parent?.key ? { parentId: parent.key } : {}),
     };
   }
+
+  private toComment(comment: JiraComment): TicketComment {
+    return {
+      id:          comment.id,
+      author:      comment.author?.displayName ?? comment.author?.emailAddress ?? 'Unknown',
+      content:     adfToText(comment.body) ?? '',
+      publishedAt: comment.created ? new Date(comment.created) : new Date(0),
+    };
+  }
 }
 
 // ── JQL / ADF helpers ─────────────────────────────────────────────────────────
@@ -182,6 +210,13 @@ interface JiraTransition {
   id: string;
   name?: string;
   to?: { name?: string };
+}
+
+interface JiraComment {
+  id: string;
+  author?: { displayName?: string; emailAddress?: string };
+  created?: string;
+  body?: unknown;
 }
 
 /** Quote a JQL string literal, escaping embedded quotes and backslashes. */
