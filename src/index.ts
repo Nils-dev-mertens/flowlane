@@ -74,6 +74,101 @@ ticketCmd
     await ticketCreateCommand(opts);
   });
 
+ticketCmd
+  .command('comment <text> [ticketId]')
+  .description('Add a comment to a ticket (defaults to current branch ticket)')
+  .option('--json', 'Output the created comment as JSON')
+  .action(async (text: string, ticketId: string | undefined, opts: { json?: boolean }) => {
+    await ensureConfig();
+    const id = resolveTicketId(ticketId);
+    if (!id) {
+      console.error(chalk.red('No ticket ID provided and could not detect one from the current branch.'));
+      process.exit(1);
+    }
+    const { ticketCommentCommand } = await import('./commands/ticketComment');
+    await ticketCommentCommand(id, text, opts);
+  });
+
+ticketCmd
+  .command('comments [ticketId]')
+  .description('List comments on a ticket (defaults to current branch ticket)')
+  .option('--json', 'Output comments as JSON')
+  .action(async (ticketId: string | undefined, opts: { json?: boolean }) => {
+    await ensureConfig();
+    const id = resolveTicketId(ticketId);
+    if (!id) {
+      console.error(chalk.red('No ticket ID provided and could not detect one from the current branch.'));
+      process.exit(1);
+    }
+    const { ticketCommentsCommand } = await import('./commands/ticketComment');
+    await ticketCommentsCommand(id, opts);
+  });
+
+ticketCmd
+  .command('close [ticketId]')
+  .description('Close/complete a ticket (defaults to current branch ticket)')
+  .option('--json', 'Output the result as JSON')
+  .action(async (ticketId: string | undefined, opts: { json?: boolean }) => {
+    await ensureConfig();
+    const id = resolveTicketId(ticketId);
+    if (!id) {
+      console.error(chalk.red('No ticket ID provided and could not detect one from the current branch.'));
+      process.exit(1);
+    }
+    const { ticketCloseCommand } = await import('./commands/ticketOps');
+    await ticketCloseCommand(id, opts);
+  });
+
+ticketCmd
+  .command('reopen [ticketId]')
+  .description('Reopen a closed ticket (defaults to current branch ticket)')
+  .option('--json', 'Output the result as JSON')
+  .action(async (ticketId: string | undefined, opts: { json?: boolean }) => {
+    await ensureConfig();
+    const id = resolveTicketId(ticketId);
+    if (!id) {
+      console.error(chalk.red('No ticket ID provided and could not detect one from the current branch.'));
+      process.exit(1);
+    }
+    const { ticketReopenCommand } = await import('./commands/ticketOps');
+    await ticketReopenCommand(id, opts);
+  });
+
+ticketCmd
+  .command('label <labels> [ticketId]')
+  .description('Add labels/tags to a ticket (defaults to current branch ticket)')
+  .option('--json', 'Output the result as JSON')
+  .action(async (labels: string, ticketId: string | undefined, opts: { json?: boolean }) => {
+    await ensureConfig();
+    const id = resolveTicketId(ticketId);
+    if (!id) {
+      console.error(chalk.red('No ticket ID provided and could not detect one from the current branch.'));
+      process.exit(1);
+    }
+    const list = labels.split(',').map((label) => label.trim()).filter(Boolean);
+    if (list.length === 0) {
+      console.error(chalk.red('No labels provided.'));
+      process.exit(1);
+    }
+    const { ticketLabelCommand } = await import('./commands/ticketOps');
+    await ticketLabelCommand(id, list, opts);
+  });
+
+ticketCmd
+  .command('assign <assignee> [ticketId]')
+  .description('Assign/reassign a ticket (defaults to current branch ticket)')
+  .option('--json', 'Output the result as JSON')
+  .action(async (assignee: string, ticketId: string | undefined, opts: { json?: boolean }) => {
+    await ensureConfig();
+    const id = resolveTicketId(ticketId);
+    if (!id) {
+      console.error(chalk.red('No ticket ID provided and could not detect one from the current branch.'));
+      process.exit(1);
+    }
+    const { ticketAssignCommand } = await import('./commands/ticketOps');
+    await ticketAssignCommand(id, assignee, opts);
+  });
+
 // ── branch ────────────────────────────────────────────────────────────────────
 
 program

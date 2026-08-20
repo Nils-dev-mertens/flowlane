@@ -111,6 +111,14 @@ export interface CreateTicketParams {
   labels?: string[];
 }
 
+/** A single comment on a ticket/work item. */
+export interface TicketComment {
+  id: string;
+  author: string;
+  content: string;
+  publishedAt: Date;
+}
+
 export interface FlowlaneConfig {
   /** Ticket/work-item provider; falls back to `platform` when omitted. */
   ticketProvider?: TicketProvider;

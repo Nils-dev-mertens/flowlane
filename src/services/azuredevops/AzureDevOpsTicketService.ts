@@ -1,10 +1,10 @@
 import { injectable, inject } from 'tsyringe';
 import * as azdev from 'azure-devops-node-api';
 import type { IWorkItemTrackingApi } from 'azure-devops-node-api/WorkItemTrackingApi';
-import type { WorkItem } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
+import type { Comment as AzWorkItemComment, WorkItem } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
 import type { ITicketService } from '../interfaces/ITicketService';
 import type { IConfigService } from '../interfaces/IConfigService';
-import type { CreateTicketParams, Ticket, TicketKind } from '../../types';
+import type { CreateTicketParams, Ticket, TicketComment, TicketKind } from '../../types';
 import { TOKENS } from '../../tokens';
 import { getAzCliToken } from '../../utils/azCliAuth';
 import { extractApiError, stripHtml } from './mappers';
@@ -37,6 +37,7 @@ export class AzureDevOpsTicketService implements ITicketService {
   private readonly project: string;
   private readonly team?: string;
   private readonly closedStates: string[];
+  private readonly activeStatus: string;
   private witApi: IWorkItemTrackingApi | null = null;
   /** Cached WEF field name for the board column (e.g. "WEF_xxx_Kanban.Column"). */
   private boardColumnField: string | null | undefined = undefined; // undefined = not yet fetched
@@ -52,6 +53,7 @@ export class AzureDevOpsTicketService implements ITicketService {
     this.closedStates = ado.closedStates
       ? ado.closedStates.split(',').map((s) => s.trim()).filter(Boolean)
       : DEFAULT_CLOSED_STATES;
+    this.activeStatus = ado.activeStatus ?? 'Active';
 
     const authHandler = authMethod === 'az-cli'
       ? azdev.getBearerHandler(getAzCliToken())
@@ -216,6 +218,77 @@ export class AzureDevOpsTicketService implements ITicketService {
     }
   }
 
+  async addComment(id: string, text: string): Promise<TicketComment> {
+    const api = await this.api();
+    try {
+      const comment = await api.addComment({ text }, this.project, parseInt(id, 10));
+      return this.toComment(comment);
+    } catch (err: unknown) {
+      throw new Error(extractApiError(err));
+    }
+  }
+
+  async getComments(id: string): Promise<TicketComment[]> {
+    const api = await this.api();
+    try {
+      const list = await api.getComments(this.project, parseInt(id, 10), 100);
+      return (list.comments ?? [])
+        .map((comment) => this.toComment(comment))
+        .sort((a, b) => a.publishedAt.getTime() - b.publishedAt.getTime());
+    } catch (err: unknown) {
+      throw new Error(extractApiError(err));
+    }
+  }
+
+  async closeTicket(id: string): Promise<void> {
+    await this.updateStatus(id, this.closedStates[0] ?? 'Done');
+  }
+
+  async reopenTicket(id: string): Promise<void> {
+    await this.updateStatus(id, this.activeStatus);
+  }
+
+  async addLabels(id: string, labels: string[]): Promise<void> {
+    const api = await this.api();
+    try {
+      // System.Tags is a semicolon-separated string; merge to preserve existing tags.
+      const workItem = await api.getWorkItem(
+        parseInt(id, 10),
+        ['System.Tags'],
+        undefined,
+        undefined,
+        this.project,
+      );
+      const existing = ((workItem?.fields?.['System.Tags'] as string | undefined) ?? '')
+        .split(';')
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+      const merged = [...new Set([...existing, ...labels])];
+      await api.updateWorkItem(
+        {},
+        [{ op: 'add', path: '/fields/System.Tags', value: merged.join('; ') }],
+        parseInt(id, 10),
+        this.project,
+      );
+    } catch (err: unknown) {
+      throw new Error(extractApiError(err));
+    }
+  }
+
+  async assignTicket(id: string, assignee: string): Promise<void> {
+    const api = await this.api();
+    try {
+      await api.updateWorkItem(
+        {},
+        [{ op: 'add', path: '/fields/System.AssignedTo', value: assignee }],
+        parseInt(id, 10),
+        this.project,
+      );
+    } catch (err: unknown) {
+      throw new Error(extractApiError(err));
+    }
+  }
+
   // ── helpers ────────────────────────────────────────────────────────────────
 
   private async api(): Promise<IWorkItemTrackingApi> {
@@ -270,6 +343,16 @@ export class AzureDevOpsTicketService implements ITicketService {
       assignee:    typeof assignee === 'object' ? assignee?.displayName : assignee,
       parentId:    f['System.Parent'] != null ? String(f['System.Parent']) : undefined,
       description: rawDescription ? stripHtml(rawDescription) : undefined,
+    };
+  }
+
+  private toComment(comment: AzWorkItemComment): TicketComment {
+    const author = comment.createdBy as { displayName?: string; uniqueName?: string } | undefined;
+    return {
+      id:          String(comment.id),
+      author:      author?.displayName ?? author?.uniqueName ?? 'Unknown',
+      content:     comment.text ?? '',
+      publishedAt: comment.createdDate ?? new Date(0),
     };
   }
 }

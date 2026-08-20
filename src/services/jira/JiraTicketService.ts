@@ -1,7 +1,7 @@
 import { injectable, inject } from 'tsyringe';
 import type { ITicketService } from '../interfaces/ITicketService';
 import type { IConfigService } from '../interfaces/IConfigService';
-import type { CreateTicketParams, Ticket, TicketKind } from '../../types';
+import type { CreateTicketParams, Ticket, TicketComment, TicketKind } from '../../types';
 import { TOKENS } from '../../tokens';
 import { JiraApiClient, JiraApiError, type JiraIssue } from './JiraApiClient';
 
@@ -102,6 +102,38 @@ export class JiraTicketService implements ITicketService {
     );
   }
 
+  /**
+   * Transition a Jira issue to the first transition matching `predicate`.
+   * Used by close/reopen where the target status name varies between projects.
+   */
+  private async transitionTo(
+    id: string,
+    predicate: (t: JiraTransition) => boolean,
+    description: string,
+  ): Promise<void> {
+    const transitions = await this.api.request<{ transitions?: JiraTransition[] }>(
+      'GET',
+      `/issue/${encodeURIComponent(id)}/transitions`,
+    );
+
+    const target = (transitions.transitions ?? []).find(predicate);
+    if (!target) {
+      const available = (transitions.transitions ?? [])
+        .map((t) => t.to?.name ?? t.name)
+        .filter(Boolean);
+      throw new JiraApiError(
+        `Jira has no transition to ${description}. ` +
+        `Available transitions: ${available.length ? available.join(', ') : 'none'}.`,
+      );
+    }
+
+    await this.api.request(
+      'POST',
+      `/issue/${encodeURIComponent(id)}/transitions`,
+      { transition: { id: target.id } },
+    );
+  }
+
   async createTicket(params: CreateTicketParams): Promise<Ticket> {
     const issueType = this.resolveIssueType(params);
 
@@ -127,6 +159,64 @@ export class JiraTicketService implements ITicketService {
 
     const created = await this.api.request<JiraIssue>('POST', '/issue', { fields });
     return this.toTicket(created);
+  }
+
+  async addComment(id: string, text: string): Promise<TicketComment> {
+    const comment = await this.api.request<JiraComment>(
+      'POST',
+      `/issue/${encodeURIComponent(id)}/comment`,
+      { body: textToAdf(text) },
+    );
+    return this.toComment(comment);
+  }
+
+  async getComments(id: string): Promise<TicketComment[]> {
+    const page = await this.api.request<{ comments?: JiraComment[] }>(
+      'GET',
+      `/issue/${encodeURIComponent(id)}/comment`,
+    );
+    return (page.comments ?? [])
+      .map((comment) => this.toComment(comment))
+      .sort((a, b) => a.publishedAt.getTime() - b.publishedAt.getTime());
+  }
+
+  async closeTicket(id: string): Promise<void> {
+    await this.transitionTo(
+      id,
+      (t) =>
+        (t.to?.name ?? t.name ?? '').toLowerCase() === 'done' ||
+        t.to?.statusCategory?.key === 'done',
+      'Done (closed)',
+    );
+  }
+
+  async reopenTicket(id: string): Promise<void> {
+    await this.transitionTo(
+      id,
+      (t) => t.to?.statusCategory?.key === 'new' || t.to?.statusCategory?.key === 'indeterminate',
+      'an open status',
+    );
+  }
+
+  async addLabels(id: string, labels: string[]): Promise<void> {
+    const issue = await this.api.request<JiraIssue>(
+      'GET',
+      `/issue/${encodeURIComponent(id)}?fields=labels`,
+    );
+    const existing = Array.isArray(issue.fields?.labels)
+      ? (issue.fields.labels as string[])
+      : [];
+    const merged = [...new Set([...existing, ...labels])];
+    await this.api.request('PUT', `/issue/${encodeURIComponent(id)}`, {
+      fields: { labels: merged },
+    });
+  }
+
+  async assignTicket(id: string, assignee: string): Promise<void> {
+    const accountId = await this.resolveAccountId(assignee);
+    await this.api.request('PUT', `/issue/${encodeURIComponent(id)}`, {
+      fields: { assignee: { id: accountId } },
+    });
   }
 
   // ── helpers ────────────────────────────────────────────────────────────────
@@ -174,6 +264,15 @@ export class JiraTicketService implements ITicketService {
       ...(parent?.key ? { parentId: parent.key } : {}),
     };
   }
+
+  private toComment(comment: JiraComment): TicketComment {
+    return {
+      id:          comment.id,
+      author:      comment.author?.displayName ?? comment.author?.emailAddress ?? 'Unknown',
+      content:     adfToText(comment.body) ?? '',
+      publishedAt: comment.created ? new Date(comment.created) : new Date(0),
+    };
+  }
 }
 
 // ── JQL / ADF helpers ─────────────────────────────────────────────────────────
@@ -181,7 +280,14 @@ export class JiraTicketService implements ITicketService {
 interface JiraTransition {
   id: string;
   name?: string;
-  to?: { name?: string };
+  to?: { name?: string; statusCategory?: { key?: string; name?: string } };
+}
+
+interface JiraComment {
+  id: string;
+  author?: { displayName?: string; emailAddress?: string };
+  created?: string;
+  body?: unknown;
 }
 
 /** Quote a JQL string literal, escaping embedded quotes and backslashes. */

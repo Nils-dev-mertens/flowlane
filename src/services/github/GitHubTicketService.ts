@@ -1,7 +1,7 @@
 import { injectable, inject } from 'tsyringe';
 import type { ITicketService } from '../interfaces/ITicketService';
 import type { IConfigService } from '../interfaces/IConfigService';
-import type { CreateTicketParams, Ticket } from '../../types';
+import type { CreateTicketParams, Ticket, TicketComment } from '../../types';
 import { TOKENS } from '../../tokens';
 import { GitHubApiClient, GitHubApiError } from './GitHubApiClient';
 import { resolveGithubToken } from '../../utils/ghCliAuth';
@@ -15,6 +15,13 @@ interface GitHubIssue {
   body: string | null;
   labels: Array<{ name: string }>;
   pull_request?: unknown;
+}
+
+interface GitHubIssueComment {
+  id: number;
+  body: string;
+  user: { login: string } | null;
+  created_at: string;
 }
 
 @injectable()
@@ -87,6 +94,49 @@ export class GitHubTicketService implements ITicketService {
     return this.toTicket(issue);
   }
 
+  async addComment(id: string, text: string): Promise<TicketComment> {
+    const comment = await this.api.request<GitHubIssueComment>(
+      'POST',
+      this.path(`/issues/${encodeURIComponent(id)}/comments`),
+      { body: text },
+    );
+    return this.toComment(comment);
+  }
+
+  async getComments(id: string): Promise<TicketComment[]> {
+    const comments = await this.api.getPaginated<GitHubIssueComment>(
+      this.path(`/issues/${encodeURIComponent(id)}/comments`),
+    );
+    return comments
+      .map((comment) => this.toComment(comment))
+      .sort((a, b) => a.publishedAt.getTime() - b.publishedAt.getTime());
+  }
+
+  async closeTicket(id: string): Promise<void> {
+    await this.updateStatus(id, 'Closed');
+  }
+
+  async reopenTicket(id: string): Promise<void> {
+    await this.updateStatus(id, 'Open');
+  }
+
+  async addLabels(id: string, labels: string[]): Promise<void> {
+    await this.api.request(
+      'POST',
+      this.path(`/issues/${encodeURIComponent(id)}/labels`),
+      { labels },
+    );
+  }
+
+  async assignTicket(id: string, assignee: string): Promise<void> {
+    const login = await this.resolveAssignee(assignee);
+    await this.api.request(
+      'PATCH',
+      this.path(`/issues/${encodeURIComponent(id)}`),
+      { assignees: [login] },
+    );
+  }
+
   private async resolveAssignee(user: string): Promise<string> {
     const configuredUser = user.trim();
 
@@ -125,6 +175,15 @@ export class GitHubTicketService implements ITicketService {
       assignee:    issue.assignee?.login,
       description: issue.body ?? undefined,
       type:        issue.labels[0]?.name,
+    };
+  }
+
+  private toComment(comment: GitHubIssueComment): TicketComment {
+    return {
+      id:          String(comment.id),
+      author:      comment.user?.login ?? 'Unknown',
+      content:     comment.body,
+      publishedAt: new Date(comment.created_at),
     };
   }
 }
