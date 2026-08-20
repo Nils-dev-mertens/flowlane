@@ -75,23 +75,33 @@ ticketCmd
   });
 
 ticketCmd
-  .command('comment <ticketId> <text>')
-  .description('Add a comment to a ticket')
+  .command('comment <text> [ticketId]')
+  .description('Add a comment to a ticket (defaults to current branch ticket)')
   .option('--json', 'Output the created comment as JSON')
-  .action(async (ticketId: string, text: string, opts: { json?: boolean }) => {
+  .action(async (text: string, ticketId: string | undefined, opts: { json?: boolean }) => {
     await ensureConfig();
+    const id = resolveTicketId(ticketId);
+    if (!id) {
+      console.error(chalk.red('No ticket ID provided and could not detect one from the current branch.'));
+      process.exit(1);
+    }
     const { ticketCommentCommand } = await import('./commands/ticketComment');
-    await ticketCommentCommand(ticketId, text, opts);
+    await ticketCommentCommand(id, text, opts);
   });
 
 ticketCmd
-  .command('comments <ticketId>')
-  .description('List comments on a ticket')
+  .command('comments [ticketId]')
+  .description('List comments on a ticket (defaults to current branch ticket)')
   .option('--json', 'Output comments as JSON')
-  .action(async (ticketId: string, opts: { json?: boolean }) => {
+  .action(async (ticketId: string | undefined, opts: { json?: boolean }) => {
     await ensureConfig();
+    const id = resolveTicketId(ticketId);
+    if (!id) {
+      console.error(chalk.red('No ticket ID provided and could not detect one from the current branch.'));
+      process.exit(1);
+    }
     const { ticketCommentsCommand } = await import('./commands/ticketComment');
-    await ticketCommentsCommand(ticketId, opts);
+    await ticketCommentsCommand(id, opts);
   });
 
 // ── branch ────────────────────────────────────────────────────────────────────
