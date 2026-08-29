@@ -6,6 +6,7 @@ import { container } from '../container';
 import { TOKENS } from '../tokens';
 import type { IConfigService } from '../services/interfaces/IConfigService';
 import type { ITicketService } from '../services/interfaces/ITicketService';
+import type { IPRService }     from '../services/interfaces/IPRService';
 import type { IGitService }    from '../services/interfaces/IGitService';
 import { generateBranchName, titleIsTruncated } from '../utils/branch';
 import { runHook }             from '../utils/hooks';
@@ -36,6 +37,9 @@ export async function branchCommand(
 
   const ticketSvc = container.resolve<ITicketService>(TOKENS.TicketService);
   const gitSvc    = container.resolve<IGitService>(TOKENS.GitService);
+  const prSvc     = container.resolve<IPRService>(TOKENS.PRService);
+  const vcsProvider = cfg.getVcsProvider();
+  const baseBranch  = cfg.getProviderConfig(vcsProvider).baseBranch || 'main';
 
   // ── Fetch ticket ──────────────────────────────────────────────────────────
 
@@ -91,22 +95,28 @@ export async function branchCommand(
   const createSpinner = safeSpinner();
   createSpinner.start('Creating branch…');
   try {
-    gitSvc.createBranch(branchName);
-    createSpinner.stop(`Branch created: ${chalk.green(branchName)}`);
+    if (vcsProvider === 'github') {
+      // Create the branch on GitHub and link it to the issue so the issue's
+      // "Development" section tracks this branch (GitHub linked-branch feature).
+      try {
+        await prSvc.createLinkedBranch(ticketId, branchName, baseBranch);
+        gitSvc.checkoutRemoteTracking(branchName);
+        createSpinner.stop(`Branch created and linked to ${chalk.cyan(ticketId)}: ${chalk.green(branchName)}`);
+      } catch (linkErr: unknown) {
+        // Fall back to the local git flow if the VCS lacks linked-branch
+        // support or the caller lacks permission to link branches.
+        p.log.warn(`Could not link branch to issue: ${errMsg(linkErr)} — creating a plain branch instead.`);
+        gitSvc.createBranch(branchName);
+        gitSvc.publishBranch(branchName);
+        createSpinner.stop(`Branch created: ${chalk.green(branchName)}`);
+      }
+    } else {
+      gitSvc.createBranch(branchName);
+      gitSvc.publishBranch(branchName);
+      createSpinner.stop(`Branch created: ${chalk.green(branchName)}`);
+    }
   } catch (err: unknown) {
     createSpinner.stop(chalk.red('Failed to create branch.'));
-    throw new Error(errMsg(err));
-  }
-
-  // ── Push branch ───────────────────────────────────────────────────────────
-
-  const pushSpinner = safeSpinner();
-  pushSpinner.start('Pushing branch to origin…');
-  try {
-    gitSvc.publishBranch(branchName);
-    pushSpinner.stop(`Pushed: ${chalk.green(branchName)}`);
-  } catch (err: unknown) {
-    pushSpinner.stop(chalk.red('Failed to push branch.'));
     throw new Error(errMsg(err));
   }
 

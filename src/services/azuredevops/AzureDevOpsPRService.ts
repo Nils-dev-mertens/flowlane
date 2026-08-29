@@ -68,6 +68,15 @@ export class AzureDevOpsPRService implements IPRService {
     return new azdev.WebApi(`https://dev.azure.com/${this.org}`, authHandler);
   }
 
+  /**
+   * Azure DevOps links a branch to a work item automatically once a pull
+   * request referencing the work item is opened, so there is no separate
+   * branch→issue link to create here.
+   */
+  async createLinkedBranch(_issueId: string, _branchName: string, _baseBranch: string): Promise<void> {
+    // no-op for Azure DevOps
+  }
+
   async createPR(params: CreatePRParams): Promise<PullRequest> {
     const { ticketId, title, description, sourceBranch, targetBranch } = params;
     const api = await this.api();
