@@ -158,26 +158,6 @@ const RESOLVE_REVIEW_THREAD_MUTATION = `
   }
 `;
 
-const ISSUE_NODE_ID_QUERY = `
-  query IssueNodeId($owner: String!, $name: String!, $number: Int!) {
-    repository(owner: $owner, name: $name) {
-      issue(number: $number) {
-        id
-      }
-    }
-  }
-`;
-
-const CREATE_LINKED_BRANCH_MUTATION = `
-  mutation CreateLinkedBranch($issueId: ID!, $name: String!, $oid: GitObjectID!) {
-    createLinkedBranch(input: { issueId: $issueId, name: $name, oid: $oid }) {
-      linkedBranch {
-        id
-      }
-    }
-  }
-`;
-
 // ── Service ───────────────────────────────────────────────────────────────────
 
 @injectable()
@@ -198,42 +178,6 @@ export class GitHubVcsService implements IPRService {
   }
 
   // ── Core PR operations ────────────────────────────────────────────────────
-
-  /**
-   * Create a branch on GitHub and link it to the given issue via the
-   * `createLinkedBranch` GraphQL mutation. The branch is based on the tip of
-   * `baseBranch`, mirroring how `flowlane start`/`branch` would branch off the
-   * configured base. The issue is identified by its number (as used
-   * everywhere else in flowlane); we resolve its global node id first.
-   */
-  async createLinkedBranch(issueId: string, branchName: string, baseBranch: string): Promise<void> {
-    const issueData = await this.api.graphql<{
-      repository: { issue: { id: string } | null } | null;
-    }>(ISSUE_NODE_ID_QUERY, {
-      owner:  this.owner,
-      name:   this.repo,
-      number: Number(issueId),
-    });
-
-    const nodeId = issueData.repository?.issue?.id;
-    if (!nodeId) {
-      throw new GitHubApiError(
-        `Could not resolve issue #${issueId} in ${this.owner}/${this.repo}.`,
-      );
-    }
-
-    const base = await this.api.request<{ commit: { sha: string } }>(
-      'GET',
-      this.path(`/branches/${encodeURIComponent(baseBranch)}`),
-    );
-    const oid = base.commit.sha;
-
-    await this.api.graphql(CREATE_LINKED_BRANCH_MUTATION, {
-      issueId: nodeId,
-      name:    branchName,
-      oid,
-    });
-  }
 
   async createPR(params: CreatePRParams): Promise<PullRequest> {
     const { ticketId, title, description, sourceBranch, targetBranch } = params;

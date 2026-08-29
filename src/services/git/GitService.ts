@@ -56,20 +56,6 @@ export class GitService implements IGitService {
     }
   }
 
-  checkoutRemoteTracking(name: string): void {
-    try {
-      this.exec(['fetch', 'origin', name]);
-      try {
-        this.exec(['checkout', '--track', `origin/${name}`]);
-      } catch {
-        // Branch may already exist locally — switch to it instead.
-        this.exec(['checkout', name]);
-      }
-    } catch (err: unknown) {
-      throw new Error(`Failed to check out remote branch "${name}": ${this.errMsg(err)}`);
-    }
-  }
-
   private exec(args: string[]): string {
     return execFileSync('git', args, { encoding: 'utf8', stdio: 'pipe' });
   }

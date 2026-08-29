@@ -120,14 +120,14 @@ Full workflow in one command:
 flowlane start 1234
 ```
 
-> On **GitHub**, the branch is created on the server via the `createLinkedBranch`
-> GraphQL mutation and linked to the issue (it shows up in the issue's
-> **Development** section immediately). flowlane then checks it out locally with
-> upstream tracking. On **Azure DevOps** the branch is created locally and pushed,
-> and is linked to the work item automatically once the PR references it.
+> On **GitHub**, the branch is created locally and pushed, and the issue is
+> linked when the PR is opened (via the `Closes #<id>` reference in the PR body —
+> the branch then appears in the issue's **Development** section). **Azure DevOps**
+> behaves the same way: the branch is created locally and pushed, and is linked to
+> the work item automatically once the PR references it through `workItemRefs`.
 
 > `flowlane start` pushes the (empty) branch to origin *before* you commit. After
-> committing locally, push again with `git push` before running
+> committing locally, push again with `git push -u origin <branch>` before running
 > `flowlane pr`, otherwise flowlane reports "There are no commits … not already in
 > the base branch" because it compares the remote branch, not local HEAD.
 
@@ -135,16 +135,11 @@ flowlane start 1234
 
 ### `flowlane branch <ticketId>`
 
-Fetches the ticket, generates a branch name, and creates it.
+Fetches the ticket, generates a branch name, creates it locally, and pushes it to origin. The branch becomes linked to the issue when the PR is opened (see `flowlane start` above).
 
 ```bash
 flowlane branch 1234
 ```
-
-On **GitHub** the branch is created on the server through `createLinkedBranch` and
-linked to the issue, then checked out locally with tracking. On **Azure DevOps**
-(and as a fallback when linking is unsupported or unauthorized) the branch is
-created locally with `git branch` and pushed with `git push -u origin <branch>`.
 
 ---
 

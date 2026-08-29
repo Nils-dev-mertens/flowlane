@@ -11,6 +11,4 @@ export interface IGitService {
   listBranches(ticketId?: string): string[];
   /** Switch to an existing local branch. */
   switchBranch(name: string): void;
-  /** Fetch a remote branch and check it out as a local branch with tracking. */
-  checkoutRemoteTracking(name: string): void;
 }

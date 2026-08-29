@@ -20,12 +20,6 @@ export interface CommentOptions {
 export interface IPRService {
   /** Open a pull request for the given params. */
   createPR(params: CreatePRParams): Promise<PullRequest>;
-  /**
-   * Create a development/feature branch on the VCS and link it to the given
-   * issue (e.g. GitHub's `createLinkedBranch`). For providers without native
-   * branch→issue linking this is a no-op.
-   */
-  createLinkedBranch(issueId: string, branchName: string, baseBranch: string): Promise<void>;
   /** Find the active PR for a given source branch. Returns null if not found. */
   findPRForBranch(branch: string): Promise<PullRequest | null>;
   /** Add a comment (optionally inline) to an existing pull request. */
