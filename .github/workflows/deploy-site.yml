@@ -4,13 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'site/**'
-      - 'README.md'
-      - 'INSTALL.md'
-      - 'LICENSE.md'
-      - 'package.json'
-      - 'docs/adding-a-provider.md'
 
 jobs:
   deploy:
