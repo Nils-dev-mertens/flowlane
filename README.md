@@ -120,6 +120,12 @@ Full workflow in one command:
 flowlane start 1234
 ```
 
+> On **GitHub**, the branch is created locally and pushed, and the issue is
+> linked when the PR is opened (via the `Closes #<id>` reference in the PR body —
+> the branch then appears in the issue's **Development** section). **Azure DevOps**
+> behaves the same way: the branch is created locally and pushed, and is linked to
+> the work item automatically once the PR references it through `workItemRefs`.
+
 > `flowlane start` pushes the (empty) branch to origin *before* you commit. After
 > committing locally, push again with `git push -u origin <branch>` before running
 > `flowlane pr`, otherwise flowlane reports "There are no commits … not already in
@@ -129,7 +135,7 @@ flowlane start 1234
 
 ### `flowlane branch <ticketId>`
 
-Fetches the ticket, generates a branch name, creates it locally, and pushes it to origin.
+Fetches the ticket, generates a branch name, creates it locally, and pushes it to origin. The branch becomes linked to the issue when the PR is opened (see `flowlane start` above).
 
 ```bash
 flowlane branch 1234

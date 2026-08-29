@@ -91,22 +91,14 @@ export async function branchCommand(
   const createSpinner = safeSpinner();
   createSpinner.start('Creating branch…');
   try {
+    // The branch is created locally and pushed; it becomes linked to the issue
+    // when the PR is opened (GitHub via the "Closes #<id>" reference, Azure DevOps
+    // via the PR's workItemRefs) — matching both providers' auto-linking.
     gitSvc.createBranch(branchName);
+    gitSvc.publishBranch(branchName);
     createSpinner.stop(`Branch created: ${chalk.green(branchName)}`);
   } catch (err: unknown) {
     createSpinner.stop(chalk.red('Failed to create branch.'));
-    throw new Error(errMsg(err));
-  }
-
-  // ── Push branch ───────────────────────────────────────────────────────────
-
-  const pushSpinner = safeSpinner();
-  pushSpinner.start('Pushing branch to origin…');
-  try {
-    gitSvc.publishBranch(branchName);
-    pushSpinner.stop(`Pushed: ${chalk.green(branchName)}`);
-  } catch (err: unknown) {
-    pushSpinner.stop(chalk.red('Failed to push branch.'));
     throw new Error(errMsg(err));
   }
 
