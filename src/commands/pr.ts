@@ -115,7 +115,7 @@ export async function prCommand(
     pr = await prSvc.createPR({
       ticketId,
       title:        ticket.title,
-      description:  buildDescription(ticket.id, ticket.title, ticket.url),
+      description:  buildDescription(ticket.id, ticket.title, ticket.url, cfg.getVcsProvider()),
       sourceBranch,
       targetBranch,
       isDraft,
@@ -144,11 +144,18 @@ export async function prCommand(
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-function buildDescription(id: string, title: string, url?: string): string {
+function buildDescription(id: string, title: string, url: string | undefined, vcsProvider: string): string {
+  // GitHub only links/auto-closes an issue when a closing keyword is directly
+  // followed by the `#id` (e.g. `Closes #28`); extra words in between break the
+  // parser. Azure DevOps links via the PR's workItemRefs, so its body text is
+  // only descriptive.
+  const closesLine = vcsProvider === 'github'
+    ? `Closes #${id}`
+    : `Closes work item #${id}`;
   return [
     '## Summary',
     '',
-    `Closes work item #${id}: ${title}`,
+    `${closesLine}: ${title}`,
     url ? `Work item: ${url}` : '',
     '',
     '## Changes',
